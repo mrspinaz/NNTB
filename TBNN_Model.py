@@ -144,12 +144,12 @@ class TBNN:
             plt.ylim(-6,6)
             plt.show()
 
-            plt.figure(1)
-            plt.title('All TB Bands')
-            plt.plot(self.all_TB_bands, 'r+')
-            plt.plot(self.extracted_bands, 'b')
-            plt.ylim(-6,6)
-            plt.show()
+            #plt.figure(1)
+            #plt.title('All TB Bands')
+            #plt.plot(self.all_TB_bands, 'r+')
+            #plt.plot(self.extracted_bands, 'b')
+            #plt.ylim(-6,6)
+            #plt.show()
 
 
     def Generate_K_Points(self):

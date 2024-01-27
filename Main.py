@@ -38,18 +38,18 @@ b = 3.631729507E-10
 #Band Structure
 bands_filename = 'HfS2_bands.dat'
 Ef = -2.5834
-num_TBbands = 24
+num_TBbands = 28
 skip_bands = 13
 
 #Routines to perform
 #plot_tb = True #Keep False if Running on cluster.
 fit_bands = True
-restart = False
+restart = True
 
 #Learning Parameters
-learn_rate = 0.01
+learn_rate = 0.005
 converge_target = 1e-6
-max_iter = 1000
+max_iter = 1300 
 
 
 def main():

@@ -209,12 +209,13 @@ class TBNN:
             delta1_min1_tensor_dagger = tf.Variable(tf.transpose(delta1_min1_tensor), dtype=tf.complex64)
 
             self.H_trainable = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
-            print(alpha)
+            
         else:
             #Generated random TB matrix:
             MLWF_file = np.loadtxt('HfS2_1L_SmallGamma.dat')
             alpha = np.reshape(MLWF_file[:,0], (self.num_TBbands,self.num_TBbands))
             print(alpha)
+            print('here')
 
             alpha_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
             beta_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)

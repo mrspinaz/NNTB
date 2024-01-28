@@ -2,7 +2,8 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-import re   
+import re 
+import os  
 
 class TBNN:
 
@@ -285,15 +286,22 @@ class TBNN:
                 
             self.E_tb_pred_np = (self.E_tb_pred).numpy()
             
-            np.savetxt('alpha.txt', alpha_tensor.numpy())
-            np.savetxt('beta.txt', beta_tensor.numpy())
-            np.savetxt('gamma.txt', gamma_tensor.numpy())
-            np.savetxt('delta11.txt', delta11_tensor.numpy())
-            np.savetxt('delta1_min1.txt', delta1_min1_tensor.numpy())
-            np.savetxt('beta_dagger.txt', beta_tensor_dagger.numpy())
-            np.savetxt('gamma_dagger.txt', gamma_tensor_dagger.numpy())
-            np.savetxt('delta11_dagger.txt', delta11_tensor_dagger.numpy())
-            np.savetxt('delta1_min1_dagger.txt', delta1_min1_tensor_dagger.numpy())
+            #Save Data
+            directory = 'H_output'
+            if not os.path.exists(directory):
+                os.mkdir(directory)
+            
+
+
+            np.savetxt(os.path.join(directory,'alpha.txt'), alpha_tensor.numpy())
+            np.savetxt(os.path.join(directory,'beta.txt'), beta_tensor.numpy())
+            np.savetxt(os.path.join(directory,'gamma.txt'), gamma_tensor.numpy())
+            np.savetxt(os.path.join(directory,'delta11.txt'), delta11_tensor.numpy())
+            np.savetxt(os.path.join(directory,'delta1_min1.txt'), delta1_min1_tensor.numpy())
+            np.savetxt(os.path.join(directory,'beta_dagger.txt'), beta_tensor_dagger.numpy())
+            np.savetxt(os.path.join(directory,'gamma_dagger.txt'), gamma_tensor_dagger.numpy())
+            np.savetxt(os.path.join(directory,'delta11_dagger.txt'), delta11_tensor_dagger.numpy())
+            np.savetxt(os.path.join(directory,'delta1_min1_dagger.txt'), delta1_min1_tensor_dagger.numpy())
 
 
     def Train_TB(self):

@@ -290,8 +290,6 @@ class TBNN:
             directory = 'H_output'
             if not os.path.exists(directory):
                 os.mkdir(directory)
-            
-
 
             np.savetxt(os.path.join(directory,'alpha.txt'), alpha_tensor.numpy())
             np.savetxt(os.path.join(directory,'beta.txt'), beta_tensor.numpy())

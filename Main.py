@@ -38,8 +38,8 @@ b = 3.631729507E-10
 #Band Structure
 bands_filename = 'HfS2_bands.dat'
 Ef = -2.5834
-num_TBbands = 26
-skip_bands = 13
+num_TBbands = 18
+skip_bands = 12
 
 #Routines to perform
 #plot_tb = True #Keep False if Running on cluster.

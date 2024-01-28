@@ -49,7 +49,7 @@ restart = False
 #Learning Parameters
 learn_rate = 0.001
 converge_target = 1e-5
-max_iter = 30
+max_iter = 1
 
 
 def main():

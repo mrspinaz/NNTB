@@ -122,8 +122,8 @@ class TBNN:
         self.extracted_bands = self.extracted_bands.T
 
         #Matrix of only the bands we want to consider in our tight binding model.
-        self.original_num_TBbands = 14
-        self.original_skip_bands = 16
+        self.original_num_TBbands = 18
+        self.original_skip_bands = 12
         self.added_bands = self.num_TBbands - self.original_num_TBbands
 
         #self.truncated_abinit_bands = self.extracted_bands[:, self.skip_bands:(self.skip_bands + self.num_TBbands) ]
@@ -178,6 +178,7 @@ class TBNN:
         self.ky = tf.convert_to_tensor(np.concatenate((ky_GX,ky_XS,ky_SY,ky_YG), axis=None), dtype=tf.complex64)
         
     def Train_MLWF(self):
+        
         opt = tf.keras.optimizers.Adam(learning_rate=self.learn_rate)
 
         if(self.do_restart):
@@ -213,40 +214,43 @@ class TBNN:
         else:
             #Generated random TB matrix:
             MLWF_file = np.loadtxt('HfS2_1L_SmallGamma.dat')
-            alpha = np.reshape(MLWF_file[:,0], (self.num_TBbands,self.num_TBbands))
-            print(alpha)
-            print('here')
+            alpha = tf.convert_to_tensor(np.reshape(MLWF_file[:,0], (self.num_TBbands,self.num_TBbands)), dtype=tf.complex64 )
+            beta = tf.convert_to_tensor(np.reshape(MLWF_file[:,1], (self.num_TBbands,self.num_TBbands)), dtype=tf.complex64 )
+            gamma = tf.convert_to_tensor(np.reshape(MLWF_file[:,2], (self.num_TBbands,self.num_TBbands)), dtype=tf.complex64 )
+            delta11 = tf.convert_to_tensor(np.reshape(MLWF_file[:,3], (self.num_TBbands,self.num_TBbands)), dtype=tf.complex64 )
+            delta1_min1 = tf.convert_to_tensor(np.reshape(MLWF_file[:,4], (self.num_TBbands,self.num_TBbands)), dtype=tf.complex64 )
 
-            alpha_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
-            beta_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
-            gamma_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
-            delta11_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
-            delta1_min1_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
+            #alpha_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
+            #beta_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
+            #gamma_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
+            #delta11_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
+            #delta1_min1_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
 
-            #Ensure the matrix is hermatian
-            #A matrix plus it's conjugate transpose is hermatian.
-            alpha_rand = alpha_rand + tf.transpose(alpha_rand)
-            beta_rand_dagger = tf.transpose(beta_rand)
-            gamma_rand_dagger = tf.transpose(gamma_rand)
-            delta11_rand_dagger = tf.transpose(delta11_rand)
-            delta1_min1_rand_dagger = tf.transpose(delta1_min1_rand)
+            beta_dagger = tf.transpose(beta)
+            gamma_dagger = tf.transpose(gamma)
+            delta11_dagger = tf.transpose(delta11)
+            delta1_min1_dagger = tf.transpose(delta1_min1)
 
             #Combine variables into one list.
-            alpha_tensor = tf.Variable(alpha_rand, dtype=tf.complex64)
-            beta_tensor = tf.Variable(beta_rand, dtype=tf.complex64)
-            gamma_tensor = tf.Variable(gamma_rand, dtype=tf.complex64)
-            delta11_tensor = tf.Variable(delta11_rand, dtype=tf.complex64)
-            delta1_min1_tensor = tf.Variable(delta1_min1_rand, dtype=tf.complex64)
+            alpha_tensor = tf.Variable(alpha, dtype=tf.complex64)
+            beta_tensor = tf.Variable(beta, dtype=tf.complex64)
+            gamma_tensor = tf.Variable(gamma, dtype=tf.complex64)
+            delta11_tensor = tf.Variable(delta11, dtype=tf.complex64)
+            delta1_min1_tensor = tf.Variable(delta1_min1, dtype=tf.complex64)
 
-            beta_tensor_dagger = tf.Variable(beta_rand_dagger, dtype=tf.complex64)
-            gamma_tensor_dagger = tf.Variable(gamma_rand_dagger, dtype=tf.complex64)
-            delta11_tensor_dagger = tf.Variable(delta11_rand_dagger, dtype=tf.complex64)
-            delta1_min1_tensor_dagger = tf.Variable(delta1_min1_rand_dagger, dtype=tf.complex64)
+            beta_tensor_dagger = tf.Variable(beta_dagger, dtype=tf.complex64)
+            gamma_tensor_dagger = tf.Variable(gamma_dagger, dtype=tf.complex64)
+            delta11_tensor_dagger = tf.Variable(delta11_dagger, dtype=tf.complex64)
+            delta1_min1_tensor_dagger = tf.Variable(delta1_min1_dagger, dtype=tf.complex64)
+
             self.H_trainable = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
+            #H_init is never modified. We use it for our loss function modifier.
+            self.H_init = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
             
         self.loss = 100
         self.count = 0
         self.loss_list = []
+        loss_factor = 1/1000
 
         if(self.do_train):
             while(self.loss > self.converge_target and self.count < self.max_iter):
@@ -264,12 +268,18 @@ class TBNN:
                     tape.watch(delta1_min1_tensor_dagger)
                     self.E_tb_pred = self.Calculate_Energy_Eigenvals(self.H_trainable)
 
-                    self.loss = tf.reduce_mean(tf.square(self.E_tb_pred - self.truncated_abinit_bands_tens))
+                    
+                    self.loss1 = tf.reduce_mean(tf.square(self.E_tb_pred - self.truncated_abinit_bands_tens))
+                    self.loss2 = 0
+                    for i in range(len(self.H_init)):
+                        self.loss2 += tf.cast(tf.reduce_mean(tf.square(tf.math.real(self.H_init[i] - self.H_trainable[i]))), dtype=tf.float32)
+                    self.loss = self.loss1 + loss_factor*self.loss2
+
                     print(self.count, (self.loss).numpy())
                 
                 grad = tape.gradient(self.loss, self.H_trainable)
-                grad_real = tf.cast(tf.math.real(grad), dtype=tf.complex64)
-                opt.apply_gradients(zip(grad_real, self.H_trainable))
+                #grad_real = tf.cast(tf.math.real(grad), dtype=tf.complex64)
+                opt.apply_gradients(zip(grad, self.H_trainable))
                 self.loss_list.append(self.loss)
                 self.count+=1
                 

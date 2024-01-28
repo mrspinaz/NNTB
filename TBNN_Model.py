@@ -122,8 +122,8 @@ class TBNN:
         self.extracted_bands = self.extracted_bands.T
 
         #Matrix of only the bands we want to consider in our tight binding model.
-        self.original_num_TBbands = 14
-        self.original_skip_bands = 16
+        self.original_num_TBbands = 18
+        self.original_skip_bands = 12
         self.added_bands = self.num_TBbands - self.original_num_TBbands
 
         #self.truncated_abinit_bands = self.extracted_bands[:, self.skip_bands:(self.skip_bands + self.num_TBbands) ]
@@ -267,7 +267,41 @@ class TBNN:
                 
                 grad = tape.gradient(self.loss, self.H_trainable)
                 grad_real = tf.cast(tf.math.real(grad), dtype=tf.complex64)
-                opt.apply_gradients(zip(grad_real, self.H_trainable))
+                
+
+                sym_grad = []
+                        #Alpha
+                diagonal = tf.linalg.tensor_diag_part(grad_real[0])
+                diag_tensor = tf.linalg.diag(diagonal)
+
+                upper_trig = tf.linalg.band_part(grad_real[0],0,-1)
+                upper_trig_diag = tf.linalg.diag(tf.linalg.tensor_diag_part(upper_trig))
+                upper_trig_nodiag = upper_trig - upper_trig_diag
+        
+                lower_trig_nodiag = tf.transpose(upper_trig_nodiag)
+                
+                sym_grad.append(diag_tensor + upper_trig_nodiag + lower_trig_nodiag)
+            
+                #beta_grad = grad_real[i]
+                sym_grad.append(grad_real[1])
+        
+                #gamma_grad = grad_real[i]
+                sym_grad.append(grad_real[2])
+        
+                #delta11_grad = grad_real[i]
+                sym_grad.append(grad_real[3])
+        
+                #delta1_min1_grad = grad_real[i]
+                sym_grad.append(grad_real[4])
+                
+                sym_grad.append(tf.transpose(grad_real[1]))
+                sym_grad.append(tf.transpose(grad_real[2]))
+                sym_grad.append(tf.transpose(grad_real[3]))
+                sym_grad.append(tf.transpose(grad_real[4]))
+                sym_grad_tens = tf.stack(sym_grad)
+           
+
+                opt.apply_gradients(zip(sym_grad_tens, self.H_trainable))
                 self.loss_list.append(self.loss)
                 self.count+=1
                 

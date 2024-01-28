@@ -38,7 +38,7 @@ b = 3.631729507E-10
 #Band Structure
 bands_filename = 'HfS2_bands.dat'
 Ef = -2.5834
-num_TBbands = 28
+num_TBbands = 26
 skip_bands = 13
 
 #Routines to perform
@@ -47,14 +47,14 @@ fit_bands = True
 restart = True
 
 #Learning Parameters
-learn_rate = 0.005
+learn_rate = 0.006
 converge_target = 1e-6
-max_iter = 1300 
+max_iter = 200
 
 
 def main():
     tbnn = TBNN(a, b, bands_filename, Ef, num_TBbands, skip_bands, fit_bands, restart, learn_rate, converge_target, max_iter)
-    tbnn.Extract_Abinit_Bands(plot_bands=False)
+    tbnn.Extract_Abinit_Bands(plot_bands=True)
     tbnn.Generate_K_Points()
     tbnn.Train_TB()
     tbnn.Plot_Bands()

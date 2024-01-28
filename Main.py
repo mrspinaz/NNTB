@@ -44,7 +44,7 @@ skip_bands = 13
 #Routines to perform
 #plot_tb = True #Keep False if Running on cluster.
 fit_bands = True
-restart = True
+restart = False
 
 #Learning Parameters
 learn_rate = 0.006
@@ -56,7 +56,7 @@ def main():
     tbnn = TBNN(a, b, bands_filename, Ef, num_TBbands, skip_bands, fit_bands, restart, learn_rate, converge_target, max_iter)
     tbnn.Extract_Abinit_Bands(plot_bands=True)
     tbnn.Generate_K_Points()
-    tbnn.Train_TB()
+    tbnn.Train_MLWF()
     tbnn.Plot_Bands()
 
 if __name__ == '__main__':

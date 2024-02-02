@@ -1,8 +1,10 @@
+# TBNN
+
 Tight-binding model generation using machine learning approach.
 
-Required Libraries:
+## Required Libraries:
 Tensorflow
 Numpy
 
-Required Files:
+## Required Files:
 .bands output file from Quantum Espresso

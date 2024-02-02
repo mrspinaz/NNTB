@@ -4,23 +4,29 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import re 
 import os  
+import warnings
+
+warnings.simplefilter("ignore", np.ComplexWarning)
 
 class TBNN:
 
-    def __init__ (self, a, b, bands_filename, Ef, num_TBbands, skip_bands, do_train, do_restart, learn_rate, converge_target, max_iter):
+    def __init__ (self, a, b, bands_filename, Ef, experiemental_bandgap, num_TBbands, skip_bands, do_train, do_restart, do_shift, learn_rate, converge_target, max_iter):
         
         self.a = a
         self.b = b
+        #Convert to complex datatype so values can be applied used in complex-valued tensor operations, ie calculating energy eigenvalues.
         self.a_tens = tf.convert_to_tensor(a, dtype=tf.complex64)
         self.b_tens = tf.convert_to_tensor(b, dtype=tf.complex64)
 
         self.bands_filename = bands_filename
         self.Ef = Ef
+        self.experiemental_bandgap = experiemental_bandgap
         self.num_TBbands = num_TBbands
         self.skip_bands = skip_bands
 
         self.do_train = do_train
         self.do_restart = do_restart
+        self.do_shift = do_shift
 
         self.learn_rate = learn_rate
         self.converge_target = converge_target
@@ -70,6 +76,9 @@ class TBNN:
 
 
     def Extract_Abinit_Bands(self,plot_bands=False):
+        """
+        Extracts ab-initio bands from the .bands Quantum Espresso file.
+        """
 
         with open(self.bands_filename) as data:
             lines = data.readlines()
@@ -89,14 +98,6 @@ class TBNN:
             kpoints_oneline_arr = np.array(kpoints_oneline, dtype=np.float32)
             kpoints_arr[text_line,:] = kpoints_oneline_arr
 
-        #self.ky = kpoints_arr[:,1]*2*np.pi/self.a
-        #self.ky = tf.convert_to_tensor(self.ky, dtype=tf.complex64)
-        
-        #self.kx = kpoints_arr[:,0]*2*np.pi/self.b
-        #self.kx = tf.convert_to_tensor(self.kx, dtype=tf.complex64)
-        
-
-        
 
         #Extract bandstructure data from Quantum Espresso bands.dat output file.
         self.extracted_bands = np.zeros((self.nband,self.nks))
@@ -122,13 +123,34 @@ class TBNN:
         self.extracted_bands = self.extracted_bands - self.Ef
         self.extracted_bands = self.extracted_bands.T
 
-        #Matrix of only the bands we want to consider in our tight binding model.
-        self.original_num_TBbands = 18
-        self.original_skip_bands = 12
-        self.added_bands = self.num_TBbands - self.original_num_TBbands
+        #Bandgap Shift. Shifting conduction and valence bands by equal magnitude in opposite direction to obtain experiental bandgap.
+        do_shift = False
+        if(do_shift):
+            first_eigval_set = self.extracted_bands[1,:]
+            pos_eigvals = [a for a in first_eigval_set if a> 0]
+            neg_eigvals = [a for a in first_eigval_set if a < 0]
 
-        #self.truncated_abinit_bands = self.extracted_bands[:, self.skip_bands:(self.skip_bands + self.num_TBbands) ]
-        #self.truncated_abinit_bands_tens = tf.convert_to_tensor(self.truncated_abinit_bands, dtype=tf.float32)
+            pos_smallest = min(pos_eigvals, key=abs)
+            neg_smallest = min(neg_eigvals, key=abs)
+            c = int(np.where(first_eigval_set == pos_smallest)[0])
+            v = int(np.where(first_eigval_set == neg_smallest)[0])
+
+            conduction_band = self.extracted_bands[:,c]
+            valence_band = self.extracted_bands[:,v]
+
+            bandgap = np.min(conduction_band) - np.max(valence_band)
+            bandgap_shift = self.experiemental_bandgap - bandgap
+            
+            self.extracted_bands[:,c:-1] += bandgap_shift/2
+            self.extracted_bands[:,0:v+1] -= bandgap_shift/2
+            
+
+
+
+        #Matrix of only the bands we want to consider in our tight binding model. Generally this is the same as our input in main(), but the basis can be increased if needed.
+        self.original_num_TBbands = self.num_TBbands
+        self.original_skip_bands = self.skip_bands
+        self.added_bands = self.num_TBbands - self.original_num_TBbands
 
         self.truncated_abinit_bands = self.extracted_bands[:, self.original_skip_bands:(self.original_skip_bands + self.original_num_TBbands) ]
         self.truncated_abinit_bands_tens = tf.convert_to_tensor(self.truncated_abinit_bands, dtype=tf.float32)
@@ -154,6 +176,10 @@ class TBNN:
 
 
     def Generate_K_Points(self):
+        """
+        Generate tensor of k-points for calculating energy eigenvalues.
+        Must be a tensor with complex datatype.
+        """
 
         a = self.a_tens
         b = self.b_tens
@@ -178,40 +204,15 @@ class TBNN:
         self.kx = tf.convert_to_tensor(np.concatenate((kx_GX,kx_XS,kx_SY,kx_YG), axis=None), dtype=tf.complex64)
         self.ky = tf.convert_to_tensor(np.concatenate((ky_GX,ky_XS,ky_SY,ky_YG), axis=None), dtype=tf.complex64)
         
-    def Train_MLWF(self):
-        
-        opt = tf.keras.optimizers.Adam(learning_rate=self.learn_rate)
 
+
+
+    def Initialize_MLWF(self):
+        """
+        Reads initial values from the .dat file output by extractTB2st_biggamma.m script.
+        """
         if(self.do_restart):
-            #Read values from alpha.txt and beta.txt
-            alpha = np.real(np.loadtxt('alpha.txt', dtype=complex))
-            beta = np.loadtxt('beta.txt', dtype=complex)
-            gamma = np.loadtxt('gamma.txt', dtype=complex)
-            delta11 = np.loadtxt('delta11.txt', dtype=complex)
-            delta1_min1 = np.loadtxt('delta1_min1.txt', dtype=complex)
-            
-            alpha = np.diag(np.diag(alpha)) + np.tril(alpha,-1) + np.transpose(np.tril(alpha,-1))
-
-            alpha_tensor = tf.convert_to_tensor(alpha, dtype=tf.complex64)
-            beta_tensor = tf.convert_to_tensor(beta, dtype=tf.complex64)
-            gamma_tensor = tf.convert_to_tensor(gamma, dtype=tf.complex64)
-            delta11_tensor = tf.convert_to_tensor(delta11, dtype=tf.complex64)
-            delta1_min1_tensor = tf.convert_to_tensor(delta1_min1, dtype=tf.complex64)
-
-            alpha_tensor = tf.Variable(alpha_tensor, dtype=tf.complex64)
-            beta_tensor = tf.Variable(beta_tensor, dtype=tf.complex64)
-            gamma_tensor = tf.Variable(gamma_tensor, dtype=tf.complex64)
-            delta11_tensor = tf.Variable(delta11_tensor, dtype=tf.complex64)
-            delta1_min1_tensor = tf.Variable(delta1_min1_tensor, dtype=tf.complex64)
-            
-            gamma_tensor = tf.Variable(gamma_tensor, dtype=tf.complex64)
-            beta_tensor_dagger = tf.Variable(tf.transpose(beta_tensor), dtype=tf.complex64)
-            gamma_tensor_dagger = tf.Variable(tf.transpose(gamma_tensor), dtype=tf.complex64)
-            delta11_tensor_dagger = tf.Variable(tf.transpose(delta11_tensor), dtype=tf.complex64)
-            delta1_min1_tensor_dagger = tf.Variable(tf.transpose(delta1_min1_tensor), dtype=tf.complex64)
-
-            self.H_trainable = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
-            
+            self.Reinitialize()
         else:
             #Generated random TB matrix:
             MLWF_file = np.loadtxt('HfS2_1L_SmallGamma.dat')
@@ -247,6 +248,83 @@ class TBNN:
             self.H_trainable = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
             #H_init is never modified. We use it for our loss function modifier.
             self.H_init = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
+
+    def Initialize_Random(self):
+        """
+        Initialize random Hamiltonian. This is currently hard-coded for the small gamma model. Could generalize code in the future.
+        """
+        if(self.do_restart):
+            self.Reinitialize()
+            
+        else:
+            #Generated random TB matrix:
+            alpha_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
+            beta_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
+            gamma_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
+            delta11_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
+            delta1_min1_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
+
+            #Ensure the matrix is hermatian
+            #A matrix plus it's conjugate transpose is hermatian.
+            alpha_rand = alpha_rand + tf.transpose(alpha_rand)
+            beta_rand_dagger = tf.transpose(beta_rand)
+            gamma_rand_dagger = tf.transpose(gamma_rand)
+            delta11_rand_dagger = tf.transpose(delta11_rand)
+            delta1_min1_rand_dagger = tf.transpose(delta1_min1_rand)
+
+            #Combine variables into one list.
+            alpha_tensor = tf.Variable(alpha_rand, dtype=tf.complex64)
+            beta_tensor = tf.Variable(beta_rand, dtype=tf.complex64)
+            gamma_tensor = tf.Variable(gamma_rand, dtype=tf.complex64)
+            delta11_tensor = tf.Variable(delta11_rand, dtype=tf.complex64)
+            delta1_min1_tensor = tf.Variable(delta1_min1_rand, dtype=tf.complex64)
+
+            beta_tensor_dagger = tf.Variable(beta_rand_dagger, dtype=tf.complex64)
+            gamma_tensor_dagger = tf.Variable(gamma_rand_dagger, dtype=tf.complex64)
+            delta11_tensor_dagger = tf.Variable(delta11_rand_dagger, dtype=tf.complex64)
+            delta1_min1_tensor_dagger = tf.Variable(delta1_min1_rand_dagger, dtype=tf.complex64)
+            self.H_trainable = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
+
+    def Reinitialize(self):
+        """
+        Re-initialize the hamiltonian elements. Called if Restart == True.
+        """
+        alpha = np.real(np.loadtxt('H_output/alpha.txt', dtype=complex))
+        beta = np.loadtxt('H_output/beta.txt', dtype=complex)
+        gamma = np.loadtxt('H_output/gamma.txt', dtype=complex)
+        delta11 = np.loadtxt('H_output/delta11.txt', dtype=complex)
+        delta1_min1 = np.loadtxt('H_output/delta1_min1.txt', dtype=complex)
+        
+        alpha = np.diag(np.diag(alpha)) + np.tril(alpha,-1) + np.transpose(np.tril(alpha,-1))
+
+        alpha_tensor = tf.convert_to_tensor(alpha, dtype=tf.complex64)
+        beta_tensor = tf.convert_to_tensor(beta, dtype=tf.complex64)
+        gamma_tensor = tf.convert_to_tensor(gamma, dtype=tf.complex64)
+        delta11_tensor = tf.convert_to_tensor(delta11, dtype=tf.complex64)
+        delta1_min1_tensor = tf.convert_to_tensor(delta1_min1, dtype=tf.complex64)
+
+        alpha_tensor = tf.Variable(alpha_tensor, dtype=tf.complex64)
+        beta_tensor = tf.Variable(beta_tensor, dtype=tf.complex64)
+        gamma_tensor = tf.Variable(gamma_tensor, dtype=tf.complex64)
+        delta11_tensor = tf.Variable(delta11_tensor, dtype=tf.complex64)
+        delta1_min1_tensor = tf.Variable(delta1_min1_tensor, dtype=tf.complex64)
+        
+        gamma_tensor = tf.Variable(gamma_tensor, dtype=tf.complex64)
+        beta_tensor_dagger = tf.Variable(tf.transpose(beta_tensor), dtype=tf.complex64)
+        gamma_tensor_dagger = tf.Variable(tf.transpose(gamma_tensor), dtype=tf.complex64)
+        delta11_tensor_dagger = tf.Variable(tf.transpose(delta11_tensor), dtype=tf.complex64)
+        delta1_min1_tensor_dagger = tf.Variable(tf.transpose(delta1_min1_tensor), dtype=tf.complex64)
+
+        self.H_trainable = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
+
+    def Train_TB(self):
+        """ 
+        This fuction is for training the bands from randomly generated Hamiltonian.
+        Each loop the loss function is calculated and used to extract the gradients.
+        Then the gradients are properly symmetrized and applied to the Hamiltonian elements.
+        
+        """
+        opt = tf.keras.optimizers.Adam(learning_rate=self.learn_rate)  
             
         self.loss = 100
         self.count = 0
@@ -257,19 +335,78 @@ class TBNN:
             while(self.loss > self.converge_target and self.count < self.max_iter):
                 
                 with tf.GradientTape() as tape:
-                    #Shouldn't acutally need the tape.watch() calls
-                    tape.watch(alpha_tensor)
-                    tape.watch(beta_tensor)
-                    tape.watch(gamma_tensor)
-                    tape.watch(delta11_tensor)
-                    tape.watch(delta1_min1_tensor)
-                    tape.watch(beta_tensor_dagger)
-                    tape.watch(gamma_tensor_dagger)
-                    tape.watch(delta11_tensor_dagger)
-                    tape.watch(delta1_min1_tensor_dagger)
+                    
                     self.E_tb_pred = self.Calculate_Energy_Eigenvals(self.H_trainable)
 
+                    self.loss = tf.reduce_mean(tf.square(self.E_tb_pred - self.truncated_abinit_bands_tens))
+                    print(self.count, (self.loss).numpy())
+                
+                grad = tape.gradient(self.loss, self.H_trainable)
+                grad_real = tf.cast(tf.math.real(grad), dtype=tf.complex64)
+                
+
+                sym_grad = []
+                
+                #Alpha
+                diagonal = tf.linalg.tensor_diag_part(grad_real[0])
+                diag_tensor = tf.linalg.diag(diagonal)
+
+                upper_trig = tf.linalg.band_part(grad_real[0],0,-1)
+                upper_trig_diag = tf.linalg.diag(tf.linalg.tensor_diag_part(upper_trig))
+                upper_trig_nodiag = upper_trig - upper_trig_diag
+        
+                lower_trig_nodiag = tf.transpose(upper_trig_nodiag)
+                
+                sym_grad.append(diag_tensor + upper_trig_nodiag + lower_trig_nodiag)
+            
+                #Beta
+                sym_grad.append(grad_real[1])
+        
+                #Gamma
+                sym_grad.append(grad_real[2])
+        
+                #Delta11
+                sym_grad.append(grad_real[3])
+        
+                #Delta1_min1
+                sym_grad.append(grad_real[4])
+                
+                #Transposed matrix blocks
+                sym_grad.append(tf.transpose(grad_real[1]))
+                sym_grad.append(tf.transpose(grad_real[2]))
+                sym_grad.append(tf.transpose(grad_real[3]))
+                sym_grad.append(tf.transpose(grad_real[4]))
+                sym_grad_tens = tf.stack(sym_grad)
+           
+
+                opt.apply_gradients(zip(sym_grad_tens, self.H_trainable))
+                self.loss_list.append(self.loss)
+                self.count+=1
+
+    def Train_MLWF(self):
+
+        """ 
+        This fuction is for training the bands starting from a MLWF Hamiltonian.
+        Each loop the loss function is calculated and used to extract the gradients.
+        An extra term is added to the loss function which penalizes large deviations from the original Hamiltonian elements.
+        This extra term compares the current iteration of the hamiltonian elements to their initial values.
+        Then the gradients are properly symmetrized and applied to the Hamiltonian elements.
+        
+        """
+        
+        opt = tf.keras.optimizers.Adam(learning_rate=self.learn_rate)   
+        self.loss = 100
+        self.count = 0
+        self.loss_list = []
+        loss_factor = 1/1000
+
+        if(self.do_train):
+            while(self.loss > self.converge_target and self.count < self.max_iter):
+                
+                with tf.GradientTape() as tape:
                     
+                    self.E_tb_pred = self.Calculate_Energy_Eigenvals(self.H_trainable)
+
                     self.loss1 = tf.reduce_mean(tf.square(self.E_tb_pred - self.truncated_abinit_bands_tens))
                     self.loss2 = 0
                     for i in range(len(self.H_init)):
@@ -315,170 +452,39 @@ class TBNN:
                 opt.apply_gradients(zip(sym_grad_tens, self.H_trainable))
                 self.loss_list.append(self.loss)
                 self.count+=1
-                
-            self.E_tb_pred_np = (self.E_tb_pred).numpy()
+
+    def Save_Output(self):  
             
-            #Save Data
-            directory = 'H_output'
-            if not os.path.exists(directory):
-                os.mkdir(directory)
+        directory = 'H_output'
+        if not os.path.exists(directory):
+            os.mkdir(directory)
 
-            np.savetxt(os.path.join(directory,'alpha.txt'), alpha_tensor.numpy())
-            np.savetxt(os.path.join(directory,'beta.txt'), beta_tensor.numpy())
-            np.savetxt(os.path.join(directory,'gamma.txt'), gamma_tensor.numpy())
-            np.savetxt(os.path.join(directory,'delta11.txt'), delta11_tensor.numpy())
-            np.savetxt(os.path.join(directory,'delta1_min1.txt'), delta1_min1_tensor.numpy())
-            np.savetxt(os.path.join(directory,'beta_dagger.txt'), beta_tensor_dagger.numpy())
-            np.savetxt(os.path.join(directory,'gamma_dagger.txt'), gamma_tensor_dagger.numpy())
-            np.savetxt(os.path.join(directory,'delta11_dagger.txt'), delta11_tensor_dagger.numpy())
-            np.savetxt(os.path.join(directory,'delta1_min1_dagger.txt'), delta1_min1_tensor_dagger.numpy())
+        np.savetxt(os.path.join(directory,'alpha.txt'), self.H_trainable[0].numpy())
+        np.savetxt(os.path.join(directory,'beta.txt'), self.H_trainable[1].numpy())
+        np.savetxt(os.path.join(directory,'gamma.txt'), self.H_trainable[2].numpy())
+        np.savetxt(os.path.join(directory,'delta11.txt'), self.H_trainable[3].numpy())
+        np.savetxt(os.path.join(directory,'delta1_min1.txt'), self.H_trainable[4].numpy())
+        np.savetxt(os.path.join(directory,'beta_dagger.txt'), self.H_trainable[5].numpy())
+        np.savetxt(os.path.join(directory,'gamma_dagger.txt'), self.H_trainable[6].numpy())
+        np.savetxt(os.path.join(directory,'delta11_dagger.txt'), self.H_trainable[7].numpy())
+        np.savetxt(os.path.join(directory,'delta1_min1_dagger.txt'), self.H_trainable[8].numpy())
 
-
-    def Train_TB(self):
-
-        opt = tf.keras.optimizers.Adam(learning_rate=self.learn_rate)
-
-        if(self.do_restart):
-            #Read values from alpha.txt and beta.txt
-            alpha = np.real(np.loadtxt('alpha.txt', dtype=complex))
-            beta = np.loadtxt('beta.txt', dtype=complex)
-            gamma = np.loadtxt('gamma.txt', dtype=complex)
-            delta11 = np.loadtxt('delta11.txt', dtype=complex)
-            delta1_min1 = np.loadtxt('delta1_min1.txt', dtype=complex)
-            
-            alpha = np.diag(np.diag(alpha)) + np.tril(alpha,-1) + np.transpose(np.tril(alpha,-1))
-
-            alpha_tensor = tf.convert_to_tensor(alpha, dtype=tf.complex64)
-            beta_tensor = tf.convert_to_tensor(beta, dtype=tf.complex64)
-            gamma_tensor = tf.convert_to_tensor(gamma, dtype=tf.complex64)
-            delta11_tensor = tf.convert_to_tensor(delta11, dtype=tf.complex64)
-            delta1_min1_tensor = tf.convert_to_tensor(delta1_min1, dtype=tf.complex64)
-
-            alpha_tensor = tf.Variable(alpha_tensor, dtype=tf.complex64)
-            beta_tensor = tf.Variable(beta_tensor, dtype=tf.complex64)
-            gamma_tensor = tf.Variable(gamma_tensor, dtype=tf.complex64)
-            delta11_tensor = tf.Variable(delta11_tensor, dtype=tf.complex64)
-            delta1_min1_tensor = tf.Variable(delta1_min1_tensor, dtype=tf.complex64)
-            
-            gamma_tensor = tf.Variable(gamma_tensor, dtype=tf.complex64)
-            beta_tensor_dagger = tf.Variable(tf.transpose(beta_tensor), dtype=tf.complex64)
-            gamma_tensor_dagger = tf.Variable(tf.transpose(gamma_tensor), dtype=tf.complex64)
-            delta11_tensor_dagger = tf.Variable(tf.transpose(delta11_tensor), dtype=tf.complex64)
-            delta1_min1_tensor_dagger = tf.Variable(tf.transpose(delta1_min1_tensor), dtype=tf.complex64)
-
-            self.H_trainable = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
-            print(alpha)
-        else:
-            #Generated random TB matrix:
-            alpha_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
-            beta_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
-            gamma_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
-            delta11_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
-            delta1_min1_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
-
-            #Ensure the matrix is hermatian
-            #A matrix plus it's conjugate transpose is hermatian.
-            alpha_rand = alpha_rand + tf.transpose(alpha_rand)
-            beta_rand_dagger = tf.transpose(beta_rand)
-            gamma_rand_dagger = tf.transpose(gamma_rand)
-            delta11_rand_dagger = tf.transpose(delta11_rand)
-            delta1_min1_rand_dagger = tf.transpose(delta1_min1_rand)
-
-            #Combine variables into one list.
-            alpha_tensor = tf.Variable(alpha_rand, dtype=tf.complex64)
-            beta_tensor = tf.Variable(beta_rand, dtype=tf.complex64)
-            gamma_tensor = tf.Variable(gamma_rand, dtype=tf.complex64)
-            delta11_tensor = tf.Variable(delta11_rand, dtype=tf.complex64)
-            delta1_min1_tensor = tf.Variable(delta1_min1_rand, dtype=tf.complex64)
-
-            beta_tensor_dagger = tf.Variable(beta_rand_dagger, dtype=tf.complex64)
-            gamma_tensor_dagger = tf.Variable(gamma_rand_dagger, dtype=tf.complex64)
-            delta11_tensor_dagger = tf.Variable(delta11_rand_dagger, dtype=tf.complex64)
-            delta1_min1_tensor_dagger = tf.Variable(delta1_min1_rand_dagger, dtype=tf.complex64)
-            self.H_trainable = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
-            
-        self.loss = 100
-        self.count = 0
-        self.loss_list = []
-
-        if(self.do_train):
-            while(self.loss > self.converge_target and self.count < self.max_iter):
-                
-                with tf.GradientTape() as tape:
-                    #Shouldn't acutally need the tape.watch() calls
-                    tape.watch(alpha_tensor)
-                    tape.watch(beta_tensor)
-                    tape.watch(gamma_tensor)
-                    tape.watch(delta11_tensor)
-                    tape.watch(delta1_min1_tensor)
-                    tape.watch(beta_tensor_dagger)
-                    tape.watch(gamma_tensor_dagger)
-                    tape.watch(delta11_tensor_dagger)
-                    tape.watch(delta1_min1_tensor_dagger)
-                    self.E_tb_pred = self.Calculate_Energy_Eigenvals(self.H_trainable)
-
-                    self.loss = tf.reduce_mean(tf.square(self.E_tb_pred - self.truncated_abinit_bands_tens))
-                    print(self.count, (self.loss).numpy())
-                
-                grad = tape.gradient(self.loss, self.H_trainable)
-                grad_real = tf.cast(tf.math.real(grad), dtype=tf.complex64)
-                
-
-                sym_grad = []
-                        #Alpha
-                diagonal = tf.linalg.tensor_diag_part(grad_real[0])
-                diag_tensor = tf.linalg.diag(diagonal)
-
-                upper_trig = tf.linalg.band_part(grad_real[0],0,-1)
-                upper_trig_diag = tf.linalg.diag(tf.linalg.tensor_diag_part(upper_trig))
-                upper_trig_nodiag = upper_trig - upper_trig_diag
+        #For plotting
+        self.H_final = [self.H_trainable[0].numpy(), self.H_trainable[1].numpy(), self.H_trainable[2].numpy(), self.H_trainable[3].numpy(), self.H_trainable[4].numpy(), self.H_trainable[5].numpy(),self.H_trainable[6].numpy(), self.H_trainable[7].numpy(), self.H_trainable[8].numpy()]
         
-                lower_trig_nodiag = tf.transpose(upper_trig_nodiag)
-                
-                sym_grad.append(diag_tensor + upper_trig_nodiag + lower_trig_nodiag)
-            
-                #beta_grad = grad_real[i]
-                sym_grad.append(grad_real[1])
-        
-                #gamma_grad = grad_real[i]
-                sym_grad.append(grad_real[2])
-        
-                #delta11_grad = grad_real[i]
-                sym_grad.append(grad_real[3])
-        
-                #delta1_min1_grad = grad_real[i]
-                sym_grad.append(grad_real[4])
-                
-                sym_grad.append(tf.transpose(grad_real[1]))
-                sym_grad.append(tf.transpose(grad_real[2]))
-                sym_grad.append(tf.transpose(grad_real[3]))
-                sym_grad.append(tf.transpose(grad_real[4]))
-                sym_grad_tens = tf.stack(sym_grad)
-           
+        #For export to NEGF
+        H_oneside = self.H_final[0:5]
+        print()
+        H_save = np.zeros((self.num_TBbands**2, 5))
+        for i,mat in enumerate(H_oneside):
+            flat_mat = np.real(mat.flatten('F')) #Flatten in column-major order.
+            H_save[:,i] = flat_mat
+        np.savetxt(os.path.join(directory,'HfS2_Small_Gamma_MLTB.dat'), H_save, delimiter='\t')  
 
-                opt.apply_gradients(zip(sym_grad_tens, self.H_trainable))
-                self.loss_list.append(self.loss)
-                self.count+=1
-                
-            self.E_tb_pred_np = (self.E_tb_pred).numpy()
-            
-            directory = 'H_output'
-            if not os.path.exists(directory):
-                os.mkdir(directory)
-
-            np.savetxt(os.path.join(directory,'alpha.txt'), alpha_tensor.numpy())
-            np.savetxt(os.path.join(directory,'beta.txt'), beta_tensor.numpy())
-            np.savetxt(os.path.join(directory,'gamma.txt'), gamma_tensor.numpy())
-            np.savetxt(os.path.join(directory,'delta11.txt'), delta11_tensor.numpy())
-            np.savetxt(os.path.join(directory,'delta1_min1.txt'), delta1_min1_tensor.numpy())
-            np.savetxt(os.path.join(directory,'beta_dagger.txt'), beta_tensor_dagger.numpy())
-            np.savetxt(os.path.join(directory,'gamma_dagger.txt'), gamma_tensor_dagger.numpy())
-            np.savetxt(os.path.join(directory,'delta11_dagger.txt'), delta11_tensor_dagger.numpy())
-            np.savetxt(os.path.join(directory,'delta1_min1_dagger.txt'), delta1_min1_tensor_dagger.numpy())
-
-            
-        
+    
     def Plot_Bands(self, plot_loss=False):
+
+        self.E_tb_pred_np = (self.E_tb_pred).numpy()
 
         plt.figure(0)
         plt.plot(self.truncated_abinit_bands,'b')
@@ -486,7 +492,46 @@ class TBNN:
         plt.plot(self.E_tb_pred_np, 'r--')
         plt.ylim(-6,6)
         plt.ylabel('E (eV)')
-        plt.title('Graphene 2pz TB Model')
+        plt.title('HfS2 TB Model')
+        plt.show()
+
+        #Plotting matrix elements 
+        H_map = np.zeros((self.num_TBbands*3,self.num_TBbands*3))
+        #Delta1_min1_dagger
+        H_map[:self.num_TBbands, :self.num_TBbands] = self.H_final[8]
+
+        #Beta_dagger
+        H_map[self.num_TBbands:self.num_TBbands*2, :self.num_TBbands] = self.H_final[5]
+
+        #Delta11_dagger
+        H_map[self.num_TBbands*2:self.num_TBbands*3, :self.num_TBbands] = self.H_final[7]
+
+        #Gamma
+        H_map[:self.num_TBbands, self.num_TBbands:self.num_TBbands*2] = self.H_final[2]
+
+        #Alpha
+        H_map[self.num_TBbands:self.num_TBbands*2, self.num_TBbands:self.num_TBbands*2] = self.H_final[0]
+
+        #Gamma_dagger
+        H_map[self.num_TBbands*2:self.num_TBbands*3, self.num_TBbands:self.num_TBbands*2] = self.H_final[6]
+
+        #Delta11
+        H_map[:self.num_TBbands, self.num_TBbands*2:self.num_TBbands*3] = self.H_final[3]
+
+        #Beta
+        H_map[self.num_TBbands:self.num_TBbands*2, self.num_TBbands*2:self.num_TBbands*3] = self.H_final[1]
+
+        #Delta1_min1
+        H_map[self.num_TBbands*2:self.num_TBbands*3, self.num_TBbands*2:self.num_TBbands*3] = self.H_final[4]
+
+
+        plt.figure()
+        im = plt.imshow(np.real(H_map), cmap="OrRd")
+        plt.colorbar(im)
+        plt.axhline(y=self.num_TBbands-0.5,color='k')
+        plt.axhline(y=self.num_TBbands*2-0.5,color='k')
+        plt.axvline(x=self.num_TBbands-0.5,color='k')
+        plt.axvline(x=self.num_TBbands*2-0.5,color='k')
         plt.show()
 
         if(plot_loss):

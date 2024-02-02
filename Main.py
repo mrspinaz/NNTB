@@ -12,6 +12,8 @@ a , b : X and Y dimensions of the unit cell, respectively.
 
 bands_filename : The name of the ab-initio .bands file output from Quantum Espresso.
 
+output_hamiltonian : Name of the output file to be exported for NEGF calculations.
+
 Ef : The fermi energy.
 
 experimental_bandgap : The experimentaly determined bandgap of the system.
@@ -48,9 +50,9 @@ fit_bands : Set to TRUE to run tight-binding fitting. Can be disabled if you jus
 
 =======OUTPUTS=======
 Graphs : Graph of the ab-initio and TB bands overlayed on each other.
+         Visual representation of Hamiltonian element values.
 
-alpha.txt, beta.txt, beta_dagger.txt : TB parameters for the real-space Hamiltonian. beta_dagger.txt is just output to verify that
-                                        the generated Hamiltonian is hermatian.
+Files: Your_Hamiltonian.dat <-- use this for NEGF code. Found in the H_output folder.
 
 '''
 
@@ -60,6 +62,7 @@ b = 3.631729507E-10
 
 #Band Structure
 bands_filename = 'HfS2_bands.dat'
+output_hamiltonian = 'HfS2_Small_Gamma_MLTB.dat'
 Ef = -2.5834
 experimental_bandgap = 3 #[eV]
 num_TBbands = 18 

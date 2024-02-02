@@ -83,7 +83,7 @@ max_iter = 1
 fit_bands = True 
 
 def main():
-    tbnn = TBNN(a, b, bands_filename, Ef, experimental_bandgap, num_TBbands, skip_bands, fit_bands, restart, learn_rate, converge_target, max_iter)
+    tbnn = TBNN(a, b, bands_filename, Ef, experimental_bandgap, num_TBbands, skip_bands, fit_bands, restart, bandgap_correction,  learn_rate, converge_target, max_iter)
     tbnn.Extract_Abinit_Bands(plot_abinit_bands)
     tbnn.Generate_K_Points()
     if(fit_MLWF):

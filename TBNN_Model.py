@@ -88,6 +88,7 @@ class TBNN:
         temp = re.findall('\d+',lines[0])
         self.nband = int(temp[0])
         self.nks = int(temp[1])
+        print(self.nks)
 
         #Extract Kpoint list
         kpoints_arr = np.zeros((self.nks,3))
@@ -178,6 +179,7 @@ class TBNN:
     def Generate_K_Points(self):
         """
         Generate tensor of k-points for calculating energy eigenvalues.
+        Assumes K-path is G -> X -> S -> Y -> G
         Must be a tensor with complex datatype.
         """
 
@@ -187,18 +189,19 @@ class TBNN:
         a = np.real(a.numpy())
         b = np.real(b.numpy())
 
+        nk_segement = int(((self.nks-1))/4)
 
-        kx_GX = np.linspace(0,np.pi/a, 32)
-        ky_GX = np.linspace(0,0, 32)
+        kx_GX = np.linspace(0,np.pi/a, nk_segement)
+        ky_GX = np.linspace(0,0, nk_segement)
 
-        kx_XS = np.linspace(np.pi/a,np.pi/a, 32)
-        ky_XS = np.linspace(0,np.pi/(b), 32)
+        kx_XS = np.linspace(np.pi/a,np.pi/a, nk_segement)
+        ky_XS = np.linspace(0,np.pi/(b), nk_segement)
 
-        kx_SY = np.linspace(np.pi/a,0, 32)
-        ky_SY = np.linspace(np.pi/b,np.pi/b, 32)
+        kx_SY = np.linspace(np.pi/a,0, nk_segement)
+        ky_SY = np.linspace(np.pi/b,np.pi/b, nk_segement)
 
-        kx_YG = np.linspace(0,0, 33)
-        ky_YG = np.linspace(np.pi/b,0, 33)
+        kx_YG = np.linspace(0,0, nk_segement+1)
+        ky_YG = np.linspace(np.pi/b,0, nk_segement+1)
 
 
         self.kx = tf.convert_to_tensor(np.concatenate((kx_GX,kx_XS,kx_SY,kx_YG), axis=None), dtype=tf.complex64)

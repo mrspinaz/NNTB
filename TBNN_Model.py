@@ -75,7 +75,7 @@ class TBNN:
 
 
 
-    def Extract_Abinit_Bands(self,plot_bands=False):
+    def Extract_Abinit_Bands(self,plot_abinit_bands):
         """
         Extracts ab-initio bands from the .bands Quantum Espresso file.
         """
@@ -157,7 +157,7 @@ class TBNN:
         self.truncated_abinit_bands_tens = tf.convert_to_tensor(self.truncated_abinit_bands, dtype=tf.float32)
         
 
-        if(plot_bands == True):
+        if(plot_abinit_bands == True):
             plt.figure(0)
             red_patch = mpatches.Patch(color='red', label='target bands')
             blue_patch = mpatches.Patch(color='blue', label='abinit bands')
@@ -334,7 +334,9 @@ class TBNN:
         self.loss_list = []
         loss_factor = 1/1000
 
+        
         if(self.do_train):
+            print('Iteration # | Loss')
             while(self.loss > self.converge_target and self.count < self.max_iter):
                 
                 with tf.GradientTape() as tape:
@@ -342,7 +344,7 @@ class TBNN:
                     self.E_tb_pred = self.Calculate_Energy_Eigenvals(self.H_trainable)
 
                     self.loss = tf.reduce_mean(tf.square(self.E_tb_pred - self.truncated_abinit_bands_tens))
-                    print(self.count, (self.loss).numpy())
+                    print(self.count,' | ' , (self.loss).numpy())
                 
                 grad = tape.gradient(self.loss, self.H_trainable)
                 grad_real = tf.cast(tf.math.real(grad), dtype=tf.complex64)
@@ -385,6 +387,14 @@ class TBNN:
                 opt.apply_gradients(zip(sym_grad_tens, self.H_trainable))
                 self.loss_list.append(self.loss)
                 self.count+=1
+
+            if self.count == self.max_iter:
+                print('Max iterations reached.')
+            elif self.loss <= self.converge_target:
+                print('Convergence target reached.')
+            else:
+                print('Unknown exit condition.')
+    
 
     def Train_MLWF(self):
 
@@ -455,6 +465,12 @@ class TBNN:
                 opt.apply_gradients(zip(sym_grad_tens, self.H_trainable))
                 self.loss_list.append(self.loss)
                 self.count+=1
+            if self.count == self.max_iter:
+                print('Max iterations reached.')
+            elif self.loss <= self.converge_target:
+                print('Convergence target reached.')
+            else:
+                print('Unknown exit condition.')
 
     def Save_Output(self):  
             

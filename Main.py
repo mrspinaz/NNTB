@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from TBNN_Model import TBNN
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 '''
 The following code generates tight-binding parameters for 2D materials using a machine learning approach. 
@@ -69,15 +70,15 @@ num_TBbands = 18
 skip_bands = 12
 
 #Routines to perform
-plot_abinit_bands = True
+plot_abinit_bands = False
 fit_MLWF = False
 restart = False
 bandgap_correction = False
 
 #Learning Parameters
-learn_rate = 0.006
-converge_target = 1e-6
-max_iter = 1
+learn_rate = 0.01
+converge_target = 90
+max_iter =20
 
 #Parameters for Testing
 fit_bands = True 

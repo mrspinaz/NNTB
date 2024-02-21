@@ -10,7 +10,7 @@ warnings.simplefilter("ignore", np.ComplexWarning)
 
 class TBNN:
 
-    def __init__ (self, a, b, bands_filename, Ef, experiemental_bandgap, num_TBbands, skip_bands, do_train, do_restart, do_shift, learn_rate, converge_target, max_iter):
+    def __init__ (self, a, b, bands_filename, output_hamiltonian, Ef, experiemental_bandgap, num_TBbands, skip_bands, do_train, do_restart, do_shift, learn_rate, converge_target, max_iter):
         
         self.a = a
         self.b = b
@@ -19,6 +19,7 @@ class TBNN:
         self.b_tens = tf.convert_to_tensor(b, dtype=tf.complex64)
 
         self.bands_filename = bands_filename
+        self.output_hamiltonian = output_hamiltonian
         self.Ef = Ef
         self.experiemental_bandgap = experiemental_bandgap
         self.num_TBbands = num_TBbands
@@ -46,13 +47,6 @@ class TBNN:
         delta1_min1_dagger = H_train[8]
 
         E = tf.zeros([len(self.kx), self.num_TBbands], dtype=tf.complex64)
-
-        #alpha = alpha + tf.transpose(alpha)
-        #beta_dagger = tf.transpose(beta)
-        #gamma_dagger = tf.transpose(gamma)
-        #delta11_dagger = tf.transpose(delta11)
-        #delta1_min1_dagger = tf.transpose(delta1_min1)
-
 
         for ii in range(len(self.kx)):
             H = alpha + beta*tf.exp(1j*self.kx[ii]*self.a_tens) + gamma*tf.exp(1j*self.ky[ii]*self.b_tens) + \
@@ -125,8 +119,8 @@ class TBNN:
         self.extracted_bands = self.extracted_bands.T
 
         #Bandgap Shift. Shifting conduction and valence bands by equal magnitude in opposite direction to obtain experiental bandgap.
-        do_shift = False
-        if(do_shift):
+        
+        if(self.do_shift):
             first_eigval_set = self.extracted_bands[1,:]
             pos_eigvals = [a for a in first_eigval_set if a> 0]
             neg_eigvals = [a for a in first_eigval_set if a < 0]
@@ -168,13 +162,6 @@ class TBNN:
             plt.ylim(-6,6)
             plt.show()
 
-            #plt.figure(1)
-            #plt.title('All TB Bands')
-            #plt.plot(self.all_TB_bands, 'r+')
-            #plt.plot(self.extracted_bands, 'b')
-            #plt.ylim(-6,6)
-            #plt.show()
-
 
     def Generate_K_Points(self):
         """
@@ -214,43 +201,40 @@ class TBNN:
         """
         Reads initial values from the .dat file output by extractTB2st_biggamma.m script.
         """
+        #Generated random TB matrix:
+        MLWF_file = np.loadtxt('HfS2_1L_SmallGamma.dat')
+        alpha = tf.convert_to_tensor(np.reshape(MLWF_file[:,0], (self.num_TBbands,self.num_TBbands)), dtype=tf.complex64 )
+        beta = tf.convert_to_tensor(np.reshape(MLWF_file[:,1], (self.num_TBbands,self.num_TBbands)), dtype=tf.complex64 )
+        gamma = tf.convert_to_tensor(np.reshape(MLWF_file[:,2], (self.num_TBbands,self.num_TBbands)), dtype=tf.complex64 )
+        delta11 = tf.convert_to_tensor(np.reshape(MLWF_file[:,3], (self.num_TBbands,self.num_TBbands)), dtype=tf.complex64 )
+        delta1_min1 = tf.convert_to_tensor(np.reshape(MLWF_file[:,4], (self.num_TBbands,self.num_TBbands)), dtype=tf.complex64 )
+
+        beta_dagger = tf.transpose(beta)
+        gamma_dagger = tf.transpose(gamma)
+        delta11_dagger = tf.transpose(delta11)
+        delta1_min1_dagger = tf.transpose(delta1_min1)
+
+        #Combine variables into one list.
+        alpha_tensor = tf.Variable(alpha, dtype=tf.complex64)
+        beta_tensor = tf.Variable(beta, dtype=tf.complex64)
+        gamma_tensor = tf.Variable(gamma, dtype=tf.complex64)
+        delta11_tensor = tf.Variable(delta11, dtype=tf.complex64)
+        delta1_min1_tensor = tf.Variable(delta1_min1, dtype=tf.complex64)
+
+        beta_tensor_dagger = tf.Variable(beta_dagger, dtype=tf.complex64)
+        gamma_tensor_dagger = tf.Variable(gamma_dagger, dtype=tf.complex64)
+        delta11_tensor_dagger = tf.Variable(delta11_dagger, dtype=tf.complex64)
+        delta1_min1_tensor_dagger = tf.Variable(delta1_min1_dagger, dtype=tf.complex64)
+
+        #H_init is never modified. We use it for our loss function modifier.
+        self.H_init = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
+        self.H_trainable = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
+    
         if(self.do_restart):
+            #overwrites H_trainable 
             self.Reinitialize()
-        else:
-            #Generated random TB matrix:
-            MLWF_file = np.loadtxt('HfS2_1L_SmallGamma.dat')
-            alpha = tf.convert_to_tensor(np.reshape(MLWF_file[:,0], (self.num_TBbands,self.num_TBbands)), dtype=tf.complex64 )
-            beta = tf.convert_to_tensor(np.reshape(MLWF_file[:,1], (self.num_TBbands,self.num_TBbands)), dtype=tf.complex64 )
-            gamma = tf.convert_to_tensor(np.reshape(MLWF_file[:,2], (self.num_TBbands,self.num_TBbands)), dtype=tf.complex64 )
-            delta11 = tf.convert_to_tensor(np.reshape(MLWF_file[:,3], (self.num_TBbands,self.num_TBbands)), dtype=tf.complex64 )
-            delta1_min1 = tf.convert_to_tensor(np.reshape(MLWF_file[:,4], (self.num_TBbands,self.num_TBbands)), dtype=tf.complex64 )
-
-            #alpha_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
-            #beta_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
-            #gamma_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
-            #delta11_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
-            #delta1_min1_rand = tf.cast(tf.random.normal([self.num_TBbands,self.num_TBbands]),  dtype=tf.complex64)
-
-            beta_dagger = tf.transpose(beta)
-            gamma_dagger = tf.transpose(gamma)
-            delta11_dagger = tf.transpose(delta11)
-            delta1_min1_dagger = tf.transpose(delta1_min1)
-
-            #Combine variables into one list.
-            alpha_tensor = tf.Variable(alpha, dtype=tf.complex64)
-            beta_tensor = tf.Variable(beta, dtype=tf.complex64)
-            gamma_tensor = tf.Variable(gamma, dtype=tf.complex64)
-            delta11_tensor = tf.Variable(delta11, dtype=tf.complex64)
-            delta1_min1_tensor = tf.Variable(delta1_min1, dtype=tf.complex64)
-
-            beta_tensor_dagger = tf.Variable(beta_dagger, dtype=tf.complex64)
-            gamma_tensor_dagger = tf.Variable(gamma_dagger, dtype=tf.complex64)
-            delta11_tensor_dagger = tf.Variable(delta11_dagger, dtype=tf.complex64)
-            delta1_min1_tensor_dagger = tf.Variable(delta1_min1_dagger, dtype=tf.complex64)
-
-            self.H_trainable = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
-            #H_init is never modified. We use it for our loss function modifier.
-            self.H_init = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
+        
+            
 
     def Initialize_Random(self):
         """
@@ -332,7 +316,7 @@ class TBNN:
         self.loss = 100
         self.count = 0
         self.loss_list = []
-        loss_factor = 1/1000
+        
 
         
         if(self.do_train):
@@ -498,17 +482,18 @@ class TBNN:
         for i,mat in enumerate(H_oneside):
             flat_mat = np.real(mat.flatten('F')) #Flatten in column-major order.
             H_save[:,i] = flat_mat
-        np.savetxt(os.path.join(directory,'HfS2_Small_Gamma_MLTB.dat'), H_save, delimiter='\t')  
+        np.savetxt(os.path.join(directory, self.output_hamiltonian), H_save, delimiter='\t')  
 
     
     def Plot_Bands(self, plot_loss=False):
 
         self.E_tb_pred_np = (self.E_tb_pred).numpy()
+        
 
         plt.figure(0)
         plt.plot(self.truncated_abinit_bands,'b')
-        
         plt.plot(self.E_tb_pred_np, 'r--')
+        plt.axvline(x=(len(self.truncated_abinit_bands)*3/4) ,color='k')
         plt.ylim(-6,6)
         plt.ylabel('E (eV)')
         plt.title('HfS2 TB Model')

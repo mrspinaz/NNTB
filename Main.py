@@ -63,28 +63,28 @@ b = 3.631729507E-10
 
 #Band Structure
 bands_filename = 'HfS2_bands.dat'
-output_hamiltonian = 'HfS2_Small_Gamma_MLTB.dat'
+output_hamiltonian = 'HfS2_Small_Gamma_MLTB_EgAdjusted.dat'
 Ef = -2.5834
-experimental_bandgap = 3 #[eV]
+experimental_bandgap = 1.8858 #[eV]
 num_TBbands = 18 
 skip_bands = 12
 
 #Routines to perform
-plot_abinit_bands = False
-fit_MLWF = False
-restart = False
-bandgap_correction = False
+plot_abinit_bands = True
+fit_MLWF = True
+restart = True
+bandgap_correction = True
 
 #Learning Parameters
-learn_rate = 0.01
-converge_target = 90
-max_iter =20
+learn_rate = 0.005
+converge_target = 1e-4
+max_iter = 200
 
 #Parameters for Testing
 fit_bands = True 
 
 def main():
-    tbnn = TBNN(a, b, bands_filename, Ef, experimental_bandgap, num_TBbands, skip_bands, fit_bands, restart, bandgap_correction,  learn_rate, converge_target, max_iter)
+    tbnn = TBNN(a, b, bands_filename, output_hamiltonian, Ef, experimental_bandgap, num_TBbands, skip_bands, fit_bands, restart, bandgap_correction,  learn_rate, converge_target, max_iter)
     tbnn.Extract_Abinit_Bands(plot_abinit_bands)
     tbnn.Generate_K_Points()
     if(fit_MLWF):

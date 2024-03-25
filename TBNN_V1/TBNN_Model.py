@@ -134,12 +134,16 @@ class TBNN:
             valence_band = self.extracted_bands[:,v]
 
             bandgap = np.min(conduction_band) - np.max(valence_band)
+            print("Ec = " , np.min(conduction_band) , "Ev = " , np.max(valence_band))
             bandgap_shift = self.experiemental_bandgap - bandgap
             
             self.extracted_bands[:,c:-1] += bandgap_shift/2
             self.extracted_bands[:,0:v+1] -= bandgap_shift/2
-            
 
+            #For testing
+            new_conduction_band = self.extracted_bands[:,c]
+            new_valence_band = self.extracted_bands[:,v]
+            print("Ec = " , np.min(new_conduction_band) , "Ev = " , np.max(new_valence_band))
 
 
         #Matrix of only the bands we want to consider in our tight binding model. Generally this is the same as our input in main(), but the basis can be increased if needed.

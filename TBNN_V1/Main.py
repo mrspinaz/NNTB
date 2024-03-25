@@ -64,21 +64,21 @@ b = 3.631729507E-10
 #Band Structure
 bands_filename = 'HfS2_bands.dat'
 output_hamiltonian = 'HfS2_Small_Gamma_MLTB_EgAdjusted.dat'
-Ef = -2.5834
+Ef = -2.5834 #-2.5 - 0.126
 experimental_bandgap = 1.8858 #[eV]
 num_TBbands = 18 
 skip_bands = 12
 
 #Routines to perform
-plot_abinit_bands = True
-fit_MLWF = True
-restart = True
-bandgap_correction = True
+plot_abinit_bands = False
+fit_MLWF = False
+restart = False
+bandgap_correction = False
 
 #Learning Parameters
 learn_rate = 0.005
-converge_target = 1e-4
-max_iter = 200
+converge_target = 5e-5
+max_iter = 1
 
 #Parameters for Testing
 fit_bands = True 

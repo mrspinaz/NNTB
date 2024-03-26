@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from TBNN_Model import TBNN
+from TBNN_Model_V2 import TBNN_V2
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 '''
@@ -19,8 +20,8 @@ Ef : The fermi energy.
 
 experimental_bandgap : The experimentaly determined bandgap of the system.
 
-num_TBbands : The number of ab-initio bands to consider for the fitting. The included bands start from the first band with energy higher than the skipped bands.
-              The size of each Hamiltonian block (alpha, beta, etc) is num_TBbands*numTBbands.
+target_bands : The number of ab-initio bands to consider for the fitting. The included bands start from the first band with energy higher than the skipped bands.
+              The dimensions of each Hamiltonian block alpha, beta, etc is (target_bands, target_bands).
 
 skip_bands : The number of ab-intio bands to skip, starting from the lowest energy band. These bands will not be used for the fitting.
 
@@ -62,15 +63,14 @@ a = 6.290339483e-10
 b = 3.631729507E-10
 
 #Band Structure
-bands_filename = 'HfS2_bands.dat'
-output_hamiltonian = 'HfS2_Small_Gamma_MLTB_EgAdjusted.dat'
+bands_filename = 'HfS2_IBZ_bands.dat'
+output_hamiltonian = 'HfS2_SmallGamma_FullIBZFit.dat'
 Ef = -2.5834 #-2.5 - 0.126
 experimental_bandgap = 1.8858 #[eV]
-num_TBbands = 18 
+target_bands = 18 
 skip_bands = 12
 
 #Routines to perform
-plot_abinit_bands = False
 fit_MLWF = False
 restart = False
 bandgap_correction = False
@@ -84,17 +84,23 @@ max_iter = 1
 fit_bands = True 
 
 def main():
-    tbnn = TBNN(a, b, bands_filename, output_hamiltonian, Ef, experimental_bandgap, num_TBbands, skip_bands, fit_bands, restart, bandgap_correction,  learn_rate, converge_target, max_iter)
-    tbnn.Extract_Abinit_Bands(plot_abinit_bands)
-    tbnn.Generate_K_Points()
-    if(fit_MLWF):
-        tbnn.Initialize_MLWF()
-        tbnn.Train_MLWF()
-    else:
-        tbnn.Initialize_Random()
-        tbnn.Train_TB()
-    tbnn.Save_Output()
-    tbnn.Plot_Bands()
+    tbnn2 = TBNN_V2(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate)
+    abinit_bands, kpoints = tbnn2.Extract_Abinit_Eigvals(bands_filename)
+
+
+    #tbnn = TBNN(a, b, bands_filename, output_hamiltonian, Ef, experimental_bandgap, num_TBbands, skip_bands, fit_bands, restart, bandgap_correction,  learn_rate, converge_target, max_iter)
+    
+
+    #tbnn.Extract_Abinit_Bands(plot_abinit_bands)
+    #tbnn.Generate_K_Points()
+    #if(fit_MLWF):
+    #    tbnn.Initialize_MLWF()
+    #    tbnn.Train_MLWF()
+    #else:
+    #    tbnn.Initialize_Random()
+    #    tbnn.Train_TB()
+    #tbnn.Save_Output()
+    #tbnn.Plot_Bands()
 
 if __name__ == '__main__':
     main()

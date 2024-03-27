@@ -5,7 +5,7 @@ import tensorflow as tf
 
 class TBNN_V2:
     #Maybe change code at some point to extract these from scf, bands, etc output files, other than boolean commands.
-    def __init__(self, a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, bands_filename):
+    def __init__(self, a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, bands_filename, output_hamiltonian_name):
         self.a = a
         self.b = b
         self.a_tens = tf.convert_to_tensor(a,dtype=tf.complex64)
@@ -20,6 +20,7 @@ class TBNN_V2:
         self.max_iter = max_iter
         self.learn_rate = learn_rate
         self.bands_filename = bands_filename
+        self.output_hamiltonian_name = output_hamiltonian_name
 
     def _Extract_Abinit_Eigvals(self, bands_filename):
 
@@ -189,6 +190,18 @@ class TBNN_V2:
         np.savetxt(os.path.join(directory,'gamma_dagger.txt'), H_trainable[6].numpy())
         np.savetxt(os.path.join(directory,'delta11_dagger.txt'), H_trainable[7].numpy())
         np.savetxt(os.path.join(directory,'delta1_min1_dagger.txt'), H_trainable[8].numpy())
+
+        #For plotting
+        self.H_final = [H_trainable[0].numpy(), H_trainable[1].numpy(), H_trainable[2].numpy(), H_trainable[3].numpy(), H_trainable[4].numpy(), H_trainable[5].numpy(), H_trainable[6].numpy(), H_trainable[7].numpy(), H_trainable[8].numpy()]
+        
+        #For export to NEGF
+        H_oneside = self.H_final[0:5] #5 is hard-coded for nearest neighbour.
+        print()
+        H_save = np.zeros((H_trainable[0].shape[1]**2, 5))
+        for i,mat in enumerate(H_oneside):
+            flat_mat = np.real(mat.flatten('F')) #Flatten in column-major order.
+            H_save[:,i] = flat_mat
+        np.savetxt(os.path.join(directory, self.output_hamiltonian_name), H_save, delimiter='\t')
 
     def fit_bands(self):
         """ 

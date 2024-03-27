@@ -1,6 +1,7 @@
 import numpy as np
 import re
 import matplotlib.pyplot as plt
+from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 
 def Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b):
@@ -44,22 +45,7 @@ def Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b):
 
         return nband, nks, truncated_bands, kpoints
 
-
-def Plot_CB_Surf(bands_filename, skip_bands, target_bands, Ef, a, b):
-    nband, nks, truncated_bands, kpoints = Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b)
-    kx = kpoints[0,:].reshape(31,31)
-    ky = kpoints[1,:].reshape(31,31)
-
-  
-    Z = truncated_bands[:,1].reshape(len(kx),len(ky))
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.plot_surface(kx,ky,Z)
-    plt.show()
-
-
-def Plot_Bands(bands_filename, skip_bands, target_bands, Ef, a, b):
-
+def Load_Hamiltonian():
     alpha = np.real(np.loadtxt('H_output/alpha.txt', dtype=complex))
     beta = np.loadtxt('H_output/beta.txt', dtype=complex)
     gamma = np.loadtxt('H_output/gamma.txt', dtype=complex)
@@ -71,29 +57,82 @@ def Plot_Bands(bands_filename, skip_bands, target_bands, Ef, a, b):
     delta11_dagger = np.loadtxt('H_output/delta11_dagger.txt', dtype=complex)
     delta1_min1_dagger = np.loadtxt('H_output/delta1_min1_dagger.txt', dtype=complex)
 
-    a = 6.290339483e-10
-    b = 3.631729507E-10
+    Hamiltonian = [alpha, beta, gamma, delta11, delta1_min1, beta_dagger, gamma_dagger, delta11_dagger, delta1_min1_dagger]
+
+    return Hamiltonian
 
 
-    kx_GX = np.linspace(0,np.pi/a, 32)
-    ky_GX = np.linspace(0,0, 32)
 
-    kx_XS = np.linspace(np.pi/a,np.pi/a, 32)
-    ky_XS = np.linspace(0,np.pi/(b), 32)
+def Plot_CB_Surf(bands_filename, skip_bands, target_bands, Ef, a, b):
+    nband, nks, truncated_bands, kpoints = Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b)
+    kx = kpoints[0,:]
+    ky = kpoints[1,:]
+    nks = len(kpoints[0,:])
 
-    kx_SY = np.linspace(np.pi/a,0, 32)
-    ky_SY = np.linspace(np.pi/b,np.pi/b, 32)
-
-    kx_YG = np.linspace(0,0, 33)
-    ky_YG = np.linspace(np.pi/b,0, 33)
-
-
-    kx = np.concatenate((kx_GX,kx_XS,kx_SY,kx_YG), axis=None)
-    ky = np.concatenate((ky_GX,ky_XS,ky_SY,ky_YG), axis=None)
-
-    E = np.zeros((alpha.shape[1],len(kx)))
+    kx_plot = kx.reshape(int(np.sqrt(nks)),int(np.sqrt(nks)))*(a/(2*np.pi))
+    ky_plot = ky.reshape(31,31)*(b/(2*np.pi))
+    #Z2 = truncated_bands[:,12].reshape(len(kx),len(ky))
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot_surface(kx_plot,ky_plot,truncated_bands[:,11].reshape(len(kx_plot),len(ky_plot)), color='blue')
+    ax.plot_surface(kx_plot,ky_plot,truncated_bands[:,12].reshape(len(kx_plot),len(ky_plot)), color='blue')
 
 
+    hamiltonian = Load_Hamiltonian()
+    alpha = hamiltonian[0]
+    beta = hamiltonian[1]
+    gamma = hamiltonian[2]
+    delta11 = hamiltonian[3]
+    delta1_min1 = hamiltonian[4]
+
+    beta_dagger = hamiltonian[5]
+    gamma_dagger = hamiltonian[6]
+    delta11_dagger = hamiltonian[7]
+    delta1_min1_dagger = hamiltonian[8]
+
+    E = np.zeros((target_bands,len(kx)))
+    for ii in range(len(kx)):
+        H = alpha + beta*np.exp(1j*kx[ii]*a) + gamma*np.exp(1j*ky[ii]*b) + \
+            delta11*np.exp(1j*kx[ii]*a + 1j*ky[ii]*b) + delta1_min1*np.exp(1j*kx[ii]*a - 1j*ky[ii]*b) + \
+            beta_dagger*np.exp(-1j*kx[ii]*a) + gamma_dagger*np.exp(-1j*ky[ii]*b) + \
+            delta11_dagger*np.exp(-1j*kx[ii]*a - 1j*ky[ii]*b) + delta1_min1_dagger*np.exp(-1j*kx[ii]*a + 1j*ky[ii]*b)
+        eigvals, eigvecs = np.linalg.eig(H)
+
+        E[:,ii] = np.sort((eigvals.T))
+    
+    E = E.T
+    ax.scatter(kx_plot,ky_plot,E[:,11].reshape(len(kx_plot),len(ky_plot)), s=2, color='red')
+    ax.scatter(kx_plot,ky_plot,E[:,12].reshape(len(kx_plot),len(ky_plot)), s=2, color='red')
+
+
+
+    #ax.plot_surface(kx,ky,Z2,cmap=cm.coolwarm)
+    ax.set_xlabel('kx')
+    ax.set_ylabel('ky')
+    ax.set_zlabel('E [eV]')
+    plt.show()
+
+
+def Plot_Bands(bands_filename, skip_bands, target_bands, Ef, a, b):
+
+    nband, nks, truncated_bands, kpoints = Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b)
+    
+    kx = kpoints[0,:]
+    ky = kpoints[1,:]
+
+    hamiltonian = Load_Hamiltonian()
+    alpha = hamiltonian[0]
+    beta = hamiltonian[1]
+    gamma = hamiltonian[2]
+    delta11 = hamiltonian[3]
+    delta1_min1 = hamiltonian[4]
+
+    beta_dagger = hamiltonian[5]
+    gamma_dagger = hamiltonian[6]
+    delta11_dagger = hamiltonian[7]
+    delta1_min1_dagger = hamiltonian[8]
+
+    E = np.zeros((target_bands,len(kx)))
     for ii in range(len(kx)):
         H = alpha + beta*np.exp(1j*kx[ii]*a) + gamma*np.exp(1j*ky[ii]*b) + \
             delta11*np.exp(1j*kx[ii]*a + 1j*ky[ii]*b) + delta1_min1*np.exp(1j*kx[ii]*a - 1j*ky[ii]*b) + \
@@ -104,8 +143,62 @@ def Plot_Bands(bands_filename, skip_bands, target_bands, Ef, a, b):
         E[:,ii] = np.sort((eigvals.T))
 
     plt.figure()
-    plt.plot(E.T,'b--')
+    x_vals = np.linspace(0,1,len(kx))
+    plt.xticks([0, 0.25, 0.5, 0.75, 1.0], ['$\Gamma$', 'X', 'S', 'Y', '$\Gamma$'])
+    plt.ylabel("E [eV]")
+    plt.plot(x_vals, truncated_bands,'r')
+    plt.plot(x_vals,E.T,'b--')
+    plt.show()
+
+def Plot_Hamiltonian():
+    hamiltonian = Load_Hamiltonian()
+
+
+    num_bands = hamiltonian[0].shape[1]
+
+     #Plotting matrix elements 
+    H_map = np.zeros((num_bands*3,num_bands*3))
+    #Delta1_min1_dagger
+    H_map[:num_bands, :num_bands] = hamiltonian[8]
+
+    #Beta_dagger
+    H_map[num_bands:num_bands*2, :num_bands] = hamiltonian[5]
+
+    #Delta11_dagger
+    H_map[num_bands*2:num_bands*3, :num_bands] = hamiltonian[7]
+
+    #Gamma
+    H_map[:num_bands, num_bands:num_bands*2] = hamiltonian[2]
+
+    #Alpha
+    H_map[num_bands:num_bands*2, num_bands:num_bands*2] = hamiltonian[0]
+
+    #Gamma_dagger
+    H_map[num_bands*2:num_bands*3, num_bands:num_bands*2] = hamiltonian[6]
+
+    #Delta11
+    H_map[:num_bands, num_bands*2:num_bands*3] = hamiltonian[3]
+
+    #Beta
+    H_map[num_bands:num_bands*2, num_bands*2:num_bands*3] = hamiltonian[1]
+
+    #Delta1_min1
+    H_map[num_bands*2:num_bands*3, num_bands*2:num_bands*3] = hamiltonian[4]
+
+
+    plt.figure()
+    im = plt.imshow(np.real(H_map), cmap="OrRd")
+    plt.colorbar(im)
+    plt.axhline(y=num_bands-0.5,color='k')
+    plt.axhline(y=num_bands*2-0.5,color='k')
+    plt.axvline(x=num_bands-0.5,color='k')
+    plt.axvline(x=num_bands*2-0.5,color='k')
     plt.show()
 
 
-Plot_CB_Surf('HfS2_IBZ_bands.dat',12,18,-2.5834, 6.290339483e-10, 3.631729507E-10)
+
+
+plt.close("all")
+#Plot_CB_Surf('HfS2_IBZ_bands.dat',12,18,-2.5834, 6.290339483e-10, 3.631729507E-10)
+#Plot_Bands('HfS2_GXSYG_bands.dat',12,18,-2.5834, 6.290339483e-10, 3.631729507E-10)
+Plot_Hamiltonian()

@@ -72,35 +72,21 @@ skip_bands = 12
 
 #Routines to perform
 fit_MLWF = False
-restart = False
+restart = True
 bandgap_correction = False
 
 #Learning Parameters
 learn_rate = 0.005
 converge_target = 5e-5
-max_iter = 1
+max_iter = 200
 
 #Parameters for Testing
 fit_bands = True 
 
 def main():
-    tbnn2 = TBNN_V2(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate)
-    abinit_bands, kpoints = tbnn2.Extract_Abinit_Eigvals(bands_filename)
-
-
+    tbnn2 = TBNN_V2(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, bands_filename)
+    tbnn2.fit_bands()
     #tbnn = TBNN(a, b, bands_filename, output_hamiltonian, Ef, experimental_bandgap, num_TBbands, skip_bands, fit_bands, restart, bandgap_correction,  learn_rate, converge_target, max_iter)
-    
-
-    #tbnn.Extract_Abinit_Bands(plot_abinit_bands)
-    #tbnn.Generate_K_Points()
-    #if(fit_MLWF):
-    #    tbnn.Initialize_MLWF()
-    #    tbnn.Train_MLWF()
-    #else:
-    #    tbnn.Initialize_Random()
-    #    tbnn.Train_TB()
-    #tbnn.Save_Output()
-    #tbnn.Plot_Bands()
 
 if __name__ == '__main__':
     main()

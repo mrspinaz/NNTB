@@ -1,12 +1,17 @@
 import re
+import os
 import numpy as np
 import tensorflow as tf
 
 class TBNN_V2:
     #Maybe change code at some point to extract these from scf, bands, etc output files, other than boolean commands.
-    def __init__(self, a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate):
+    def __init__(self, a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, bands_filename):
         self.a = a
         self.b = b
+        self.a_tens = tf.convert_to_tensor(a,dtype=tf.complex64)
+        self.b_tens = tf.convert_to_tensor(b,dtype=tf.complex64)
+
+
         self.Ef = Ef
         self.restart = restart
         self.skip_bands = skip_bands
@@ -14,12 +19,11 @@ class TBNN_V2:
         self.converge_target = converge_target
         self.max_iter = max_iter
         self.learn_rate = learn_rate
+        self.bands_filename = bands_filename
 
-    def Extract_Abinit_Eigvals(self, bands_filename):
+    def _Extract_Abinit_Eigvals(self, bands_filename):
 
         file_dir = 'inputs/' + bands_filename
-
-
 
         with open(file_dir) as file:
             first_line = file.readline().strip()
@@ -44,7 +48,9 @@ class TBNN_V2:
                     abinit_bands[start:start + len(line_split)] = line_split
                     start += len(line_split)
 
-            abinit_bands = abinit_bands.reshape(nks,nband)        
+            abinit_bands = abinit_bands - self.Ef
+            abinit_bands = abinit_bands.reshape(nks,nband)
+            truncated_bands = abinit_bands[:, self.skip_bands:(self.skip_bands + self.target_bands)]        
             
 
         file.close()
@@ -54,7 +60,10 @@ class TBNN_V2:
         kpoints[0,:] =  (kpoints[0,:])*(2.0*np.pi/self.a)
         kpoints[1,:] =  (kpoints[1,:]/ky_factor)*(2.0*np.pi/self.b)
         
-        return abinit_bands, kpoints
+        kpoints = tf.convert_to_tensor(kpoints, dtype =tf.complex64)
+        truncated_bands = tf.convert_to_tensor(truncated_bands, dtype =tf.float32)
+
+        return nband, nks, truncated_bands, kpoints
     
     def _Initialize_Hamiltonian(self):
 
@@ -90,7 +99,7 @@ class TBNN_V2:
 
         return H_trainable
 
-    def Reinitialize(self):
+    def _Reinitialize(self):
         """
         Re-initialize the hamiltonian elements. Called if Restart == True.
         """
@@ -124,33 +133,100 @@ class TBNN_V2:
         
         return H_trainable
     
+
+    def Calculate_Energy_Eigenvals(self, H_train, kpoints, nks):
+
+            alpha = H_train[0]
+            beta = H_train[1]
+            gamma = H_train[2]
+            delta11 = H_train[3]
+            delta1_min1 = H_train[4]
+            beta_dagger = H_train[5]
+            gamma_dagger = H_train[6]
+            delta11_dagger = H_train[7]
+            delta1_min1_dagger = H_train[8]
+
+           
+            E = tf.zeros([nks, self.target_bands], dtype=tf.complex64)
+
+            for ii in range(nks):
+                H = alpha + \
+                    beta*tf.exp(1j*kpoints[0][ii]*self.a_tens) + \
+                    gamma*tf.exp(1j*kpoints[1][ii]*self.b_tens) + \
+                    delta11*tf.exp(1j*kpoints[0][ii]*self.a_tens + 1j*kpoints[1][ii]*self.b_tens) + \
+                    delta1_min1*tf.exp(1j*kpoints[0][ii]*self.a_tens - 1j*kpoints[1][ii]*self.b_tens) + \
+                    beta_dagger*tf.exp(-1j*kpoints[0][ii]*self.a_tens) + \
+                    gamma_dagger*tf.exp(-1j*kpoints[1][ii]*self.b_tens) + \
+                    delta11_dagger*tf.exp(-1j*kpoints[0][ii]*self.a_tens - 1j*kpoints[1][ii]*self.b_tens) + \
+                    delta1_min1_dagger*tf.exp(-1j*kpoints[0][ii]*self.a_tens + 1j*kpoints[1][ii]*self.b_tens)
+                
+                eigvals, eigvecs = tf.linalg.eig(H) #tf.linalg.eigh(H)
+                eigvals = tf.reshape(eigvals, shape=[1,self.target_bands])
+                
+                E = E + tf.scatter_nd([[ii]],eigvals,[nks,self.target_bands])
+
+            #Flatten numpy array and convert back to tensor. The math.real() operation converts datatype to float32.
+            E = tf.math.real(E)
+            E = tf.sort(E, axis=1)
+            #E = E[:, self.added_bands//2 : self.added_bands//2 + self.original_num_TBbands]
+            #E_frac = E.numpy()
+            #E_frac = E_frac[:,self.added_bands//2 : self.added_bands//2 + self.original_num_TBbands]
+            #E_frac = tf.convert_to_tensor(E_frac, dtype=tf.float32)
+            return E
+
+    def _Save_Output(self, H_trainable):  
+            
+        directory = 'H_output'
+        if not os.path.exists(directory):
+            os.mkdir(directory)
+
+        np.savetxt(os.path.join(directory,'alpha.txt'), H_trainable[0].numpy())
+        np.savetxt(os.path.join(directory,'beta.txt'), H_trainable[1].numpy())
+        np.savetxt(os.path.join(directory,'gamma.txt'), H_trainable[2].numpy())
+        np.savetxt(os.path.join(directory,'delta11.txt'), H_trainable[3].numpy())
+        np.savetxt(os.path.join(directory,'delta1_min1.txt'), H_trainable[4].numpy())
+        np.savetxt(os.path.join(directory,'beta_dagger.txt'), H_trainable[5].numpy())
+        np.savetxt(os.path.join(directory,'gamma_dagger.txt'), H_trainable[6].numpy())
+        np.savetxt(os.path.join(directory,'delta11_dagger.txt'), H_trainable[7].numpy())
+        np.savetxt(os.path.join(directory,'delta1_min1_dagger.txt'), H_trainable[8].numpy())
+
     def fit_bands(self):
         """ 
         This fuction is for training the bands from randomly generated Hamiltonian.
         Each loop the loss function is calculated and used to extract the gradients.
-        Then the gradients are properly symmetrized and applied to the Hamiltonian elements.
+        Then the gradients are symmetrized and applied to the Hamiltonian elements.
         
         """
-        opt = tf.keras.optimizers.Adam(learning_rate=self.learn_rate)  
+        
             
+
+        #abinit_bands and kpoints are already tensor objects
+        nband, nks, truncated_bands, kpoints = self._Extract_Abinit_Eigvals(self.bands_filename)
+        
+        #initialize Hamiltonian
+        if(self.restart):
+            H_trainable = self._Reinitialize()
+        else:
+            H_trainable = self._Initialize_Hamiltonian()
+        
+        #Truncate bands
+        
+
+        opt = tf.keras.optimizers.Adam(learning_rate=self.learn_rate)  
         loss = 100
         count = 0
         loss_list = []
 
-        H_trainable = self._Initialize_Hamiltonian()
-
-        
-        
-        while(self.loss > self.converge_target and count < self.max_iter):
+        while(loss > self.converge_target and count < self.max_iter):
             
             with tf.GradientTape() as tape:
                 
-                self.E_tb_pred = self.Calculate_Energy_Eigenvals(H_trainable)
+                E_tb_pred = self.Calculate_Energy_Eigenvals(H_trainable, kpoints, nks)
 
-                self.loss = tf.reduce_mean(tf.square(self.E_tb_pred - self.truncated_abinit_bands_tens))
-                print('Iteration: ', count,' Loss: ' , (self.loss).numpy())
+                loss = tf.reduce_mean(tf.square(E_tb_pred - truncated_bands))
+                print('Iteration: ', count,' Loss: ' , (loss).numpy())
             
-            grad = tape.gradient(self.loss, H_trainable)
+            grad = tape.gradient(loss, H_trainable)
             grad_real = tf.cast(tf.math.real(grad), dtype=tf.complex64)
             
 
@@ -192,12 +268,16 @@ class TBNN_V2:
             loss_list.append(loss)
             count+=1
 
-        if self.count == self.max_iter:
+        if count == self.max_iter:
             print('Max iterations reached.')
-        elif self.loss <= self.converge_target:
+        elif loss <= self.converge_target:
             print('Convergence target reached.')
         else:
             print('Unknown exit condition.')
+        
+        self._Save_Output(H_trainable)
+
+        
     
 
 

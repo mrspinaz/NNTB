@@ -13,7 +13,7 @@ class TBNN:
     def __init__ (self, a, b, bands_filename, output_hamiltonian, Ef, experiemental_bandgap, num_TBbands, skip_bands, do_train, do_restart, do_shift, learn_rate, converge_target, max_iter):
         
         self.a = a
-        self.b = b
+        self.b =  b
         #Convert to complex datatype so values can be applied used in complex-valued tensor operations, ie calculating energy eigenvalues.
         self.a_tens = tf.convert_to_tensor(a, dtype=tf.complex64)
         self.b_tens = tf.convert_to_tensor(b, dtype=tf.complex64)

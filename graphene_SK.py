@@ -254,7 +254,10 @@ for i,k in enumerate(k_path_coords):
         print(gamma.T[4:8,0:4])
         print(np.round(np.real(H[4:8,0:4]),4))
         print("Hamiltonian at Gamma: \n", np.round(np.real(H),3))
-        
+
+#Output Bands File
+np.savetxt(('SK_input/graphene_sp3_bands.txt'), bands.T)
+
 #Convert from eV to Ha
 bands[:,:] *= 0.0367492929        
                 

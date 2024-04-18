@@ -5,7 +5,7 @@ import tensorflow as tf
 
 class TBNN_V2:
     #Maybe change code at some point to extract these from scf, bands, etc output files, other than boolean commands.
-    def __init__(self, a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, bands_filename, output_hamiltonian_name, adjust_bandgap):
+    def __init__(self, a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, bands_filename, output_hamiltonian_name, adjust_bandgap, experimental_bandgap):
         self.a = a
         self.b = b
         self.a_tens = tf.convert_to_tensor(a,dtype=tf.complex64)
@@ -21,7 +21,9 @@ class TBNN_V2:
         self.learn_rate = learn_rate
         self.bands_filename = bands_filename
         self.output_hamiltonian_name = output_hamiltonian_name
-        self.adjust_bandgap;
+
+        self.adjust_bandgap = adjust_bandgap
+        self.experimental_bandgap = experimental_bandgap
 
     def _Extract_Abinit_Eigvals(self, bands_filename):
 
@@ -61,6 +63,35 @@ class TBNN_V2:
         ky_factor = self.a/self.b
         kpoints[0,:] =  (kpoints[0,:])*(2.0*np.pi/self.a)
         kpoints[1,:] =  (kpoints[1,:]/ky_factor)*(2.0*np.pi/self.b)
+        
+
+
+        
+        if(self.adjust_bandgap):
+            first_eigval_set = truncated_bands[1,:]
+            pos_eigvals = [a for a in first_eigval_set if a> 0]
+            neg_eigvals = [a for a in first_eigval_set if a < 0]
+
+            pos_smallest = min(pos_eigvals, key=abs)
+            neg_smallest = min(neg_eigvals, key=abs)
+            c = int(np.where(first_eigval_set == pos_smallest)[0])
+            v = int(np.where(first_eigval_set == neg_smallest)[0])
+
+            conduction_band = truncated_bands[:,c]
+            valence_band = truncated_bands[:,v]
+
+            bandgap = np.min(conduction_band) - np.max(valence_band)
+            print("Ec = " , np.min(conduction_band) , "Ev = " , np.max(valence_band))
+            bandgap_shift = self.experimental_bandgap - bandgap
+            
+            truncated_bands[:,c:-1] += bandgap_shift/2
+            truncated_bands[:,0:v+1] -= bandgap_shift/2
+
+            #For testing
+            new_conduction_band = truncated_bands[:,c]
+            new_valence_band = truncated_bands[:,v]
+            print("Ec = " , np.min(new_conduction_band) , "Ev = " , np.max(new_valence_band))
+
         
         kpoints = tf.convert_to_tensor(kpoints, dtype =tf.complex64)
         truncated_bands = tf.convert_to_tensor(truncated_bands, dtype =tf.float32)
@@ -231,7 +262,7 @@ class TBNN_V2:
         print("Ec = " , np.min(new_conduction_band) , "Ev = " , np.max(new_valence_band))
 
 
-    def _Fit_Bands(self, experimental_bandgap):
+    def fit_bands(self, experimental_bandgap):
         """ 
         This fuction is for training the bands from randomly generated Hamiltonian.
         Each loop the loss function is calculated and used to extract the gradients.
@@ -243,8 +274,6 @@ class TBNN_V2:
 
         #abinit_bands and kpoints are already tensor objects
         nband, nks, truncated_bands, kpoints = self._Extract_Abinit_Eigvals(self.bands_filename)
-        if(self.adjust_bandgap):
-            truncated_bands = self._Fit_Bands(truncated_bands)
         
         #initialize Hamiltonian
         if(self.restart):

@@ -73,18 +73,18 @@ skip_bands = 12
 #Routines to perform
 fit_MLWF = False
 restart = True
-bandgap_correction = False
+bandgap_correction = True
 
 #Learning Parameters
 learn_rate = 0.005
-converge_target = 5e-5
-max_iter = 1
+converge_target = 7e-5
+max_iter = 400
 
 #Parameters for Testing
 fit_bands = True 
 
 def main():
-    tbnn2 = TBNN_V2(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, bands_filename, output_hamiltonian_name, bandgap_correction)
+    tbnn2 = TBNN_V2(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, bands_filename, output_hamiltonian_name, bandgap_correction, experimental_bandgap)
     tbnn2.fit_bands(experimental_bandgap)
     #tbnn = TBNN(a, b, bands_filename, output_hamiltonian, Ef, experimental_bandgap, num_TBbands, skip_bands, fit_bands, restart, bandgap_correction,  learn_rate, converge_target, max_iter)
 

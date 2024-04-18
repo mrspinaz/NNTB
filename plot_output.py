@@ -41,7 +41,7 @@ def Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b):
         #Convert k_points to their actual values
         ky_factor = a/b
         kpoints[0,:] =  (kpoints[0,:])*(2.0*np.pi/a)
-        kpoints[1,:] =  (kpoints[1,:]/ky_factor)*(2.0*np.pi/b)
+        kpoints[1,:] =  (kpoints[1,:]/ky_factor)*(2.0*np.pi/b)  
 
         return nband, nks, truncated_bands, kpoints
 
@@ -116,6 +116,33 @@ def Plot_CB_Surf(bands_filename, skip_bands, target_bands, Ef, a, b):
 def Plot_Bands(bands_filename, skip_bands, target_bands, Ef, a, b):
 
     nband, nks, truncated_bands, kpoints = Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b)
+
+    adjust_bandgap = True
+    experimental_bandgap = 1.8858
+    if(adjust_bandgap):
+        first_eigval_set = truncated_bands[1,:]
+        pos_eigvals = [a for a in first_eigval_set if a> 0]
+        neg_eigvals = [a for a in first_eigval_set if a < 0]
+
+        pos_smallest = min(pos_eigvals, key=abs)
+        neg_smallest = min(neg_eigvals, key=abs)
+        c = int(np.where(first_eigval_set == pos_smallest)[0])
+        v = int(np.where(first_eigval_set == neg_smallest)[0])
+
+        conduction_band = truncated_bands[:,c]
+        valence_band = truncated_bands[:,v]
+
+        bandgap = np.min(conduction_band) - np.max(valence_band)
+        print("Ec = " , np.min(conduction_band) , "Ev = " , np.max(valence_band))
+        bandgap_shift = experimental_bandgap - bandgap
+        
+        truncated_bands[:,c:-1] += bandgap_shift/2
+        truncated_bands[:,0:v+1] -= bandgap_shift/2
+
+        #For testing
+        new_conduction_band = truncated_bands[:,c]
+        new_valence_band = truncated_bands[:,v]
+        print("Ec = " , np.min(new_conduction_band) , "Ev = " , np.max(new_valence_band))
     
     kx = kpoints[0,:]
     ky = kpoints[1,:]
@@ -199,6 +226,6 @@ def Plot_Hamiltonian():
 
 
 plt.close("all")
-#Plot_CB_Surf('HfS2_IBZ_bands.dat',12,18,-2.5834, 6.290339483e-10, 3.631729507E-10)
-#Plot_Bands('HfS2_GXSYG_bands.dat',12,18,-2.5834, 6.290339483e-10, 3.631729507E-10)
+Plot_CB_Surf('HfS2_IBZ_bands.dat',12,18,-2.5834, 6.290339483e-10, 3.631729507E-10)
+Plot_Bands('HfS2_GXSYG_bands.dat',12,18,-2.5834, 6.290339483e-10, 3.631729507E-10)
 Plot_Hamiltonian()

@@ -76,9 +76,9 @@ restart = True
 bandgap_correction = True
 
 #Learning Parameters
-learn_rate = 0.005
+learn_rate = 0.01
 converge_target = 7e-5
-max_iter = 400
+max_iter = 50
 
 #Parameters for Testing
 fit_bands = True 

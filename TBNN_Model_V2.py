@@ -81,7 +81,7 @@ class TBNN_V2:
             valence_band = truncated_bands[:,v]
 
             bandgap = np.min(conduction_band) - np.max(valence_band)
-            print("Ec = " , np.min(conduction_band) , "Ev = " , np.max(valence_band))
+            #print("Ec = " , np.min(conduction_band) , "Ev = " , np.max(valence_band))
             bandgap_shift = self.experimental_bandgap - bandgap
             
             truncated_bands[:,c:-1] += bandgap_shift/2
@@ -90,7 +90,7 @@ class TBNN_V2:
             #For testing
             new_conduction_band = truncated_bands[:,c]
             new_valence_band = truncated_bands[:,v]
-            print("Ec = " , np.min(new_conduction_band) , "Ev = " , np.max(new_valence_band))
+            #print("Ec = " , np.min(new_conduction_band) , "Ev = " , np.max(new_valence_band))
 
         
         kpoints = tf.convert_to_tensor(kpoints, dtype =tf.complex64)
@@ -285,9 +285,10 @@ class TBNN_V2:
         
 
         opt = tf.keras.optimizers.Adam(learning_rate=self.learn_rate)  
-        loss = 100
-        count = 0
+        loss = 10000
+        loss_factor = 1e-3 #This will be chosen to obtain best fit. 0.1 too high it overprioritizes sparcity
         loss_list = []
+        count = 0
 
         while(loss > self.converge_target and count < self.max_iter):
             
@@ -295,7 +296,11 @@ class TBNN_V2:
                 
                 E_tb_pred = self.Calculate_Energy_Eigenvals(H_trainable, kpoints, nks)
 
-                loss = tf.reduce_mean(tf.square(E_tb_pred - truncated_bands))
+                loss1 = tf.reduce_mean(tf.square(E_tb_pred - truncated_bands))
+                loss_reg = 0
+                for i in range(len(H_trainable)):
+                    loss_reg += tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[i])))), dtype=tf.float32)
+                loss = loss1 + loss_factor*loss_reg
                 print('Iteration: ', count,' Loss: ' , (loss).numpy())
             
             grad = tape.gradient(loss, H_trainable)

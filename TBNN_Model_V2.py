@@ -5,7 +5,7 @@ import tensorflow as tf
 
 class TBNN_V2:
     #Maybe change code at some point to extract these from scf, bands, etc output files, other than boolean commands.
-    def __init__(self, a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, bands_filename, output_hamiltonian_name, adjust_bandgap, experimental_bandgap):
+    def __init__(self, a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor ,bands_filename, output_hamiltonian_name, adjust_bandgap, experimental_bandgap):
         self.a = a
         self.b = b
         self.a_tens = tf.convert_to_tensor(a,dtype=tf.complex64)
@@ -19,6 +19,7 @@ class TBNN_V2:
         self.converge_target = converge_target
         self.max_iter = max_iter
         self.learn_rate = learn_rate
+        self.regularization_factor = regularization_factor
         self.bands_filename = bands_filename
         self.output_hamiltonian_name = output_hamiltonian_name
 
@@ -262,7 +263,7 @@ class TBNN_V2:
         print("Ec = " , np.min(new_conduction_band) , "Ev = " , np.max(new_valence_band))
 
 
-    def fit_bands(self, experimental_bandgap):
+    def fit_bands(self):
         """ 
         This fuction is for training the bands from randomly generated Hamiltonian.
         Each loop the loss function is calculated and used to extract the gradients.
@@ -286,7 +287,6 @@ class TBNN_V2:
 
         opt = tf.keras.optimizers.Adam(learning_rate=self.learn_rate)  
         loss = 10000
-        loss_factor = 1e-3 #This will be chosen to obtain best fit. 0.1 too high it overprioritizes sparcity
         loss_list = []
         count = 0
 
@@ -297,10 +297,11 @@ class TBNN_V2:
                 E_tb_pred = self.Calculate_Energy_Eigenvals(H_trainable, kpoints, nks)
 
                 loss1 = tf.reduce_mean(tf.square(E_tb_pred - truncated_bands))
+
                 loss_reg = 0
                 for i in range(len(H_trainable)):
                     loss_reg += tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[i])))), dtype=tf.float32)
-                loss = loss1 + loss_factor*loss_reg
+                loss = loss1 + self.regularization_factor*loss_reg
                 print('Iteration: ', count,' Loss: ' , (loss).numpy())
             
             grad = tape.gradient(loss, H_trainable)

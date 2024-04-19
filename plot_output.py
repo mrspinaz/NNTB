@@ -70,7 +70,7 @@ def Plot_CB_Surf(bands_filename, skip_bands, target_bands, Ef, a, b):
     nks = len(kpoints[0,:])
 
     kx_plot = kx.reshape(int(np.sqrt(nks)),int(np.sqrt(nks)))*(a/(2*np.pi))
-    ky_plot = ky.reshape(31,31)*(b/(2*np.pi))
+    ky_plot = ky.reshape(11,11)*(b/(2*np.pi))
     #Z2 = truncated_bands[:,12].reshape(len(kx),len(ky))
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -214,7 +214,7 @@ def Plot_Hamiltonian():
 
 
     plt.figure()
-    im = plt.imshow(np.real(H_map), cmap="OrRd")
+    im = plt.imshow(np.real(H_map), cmap="OrRd",vmin=-2.5, vmax=3)
     plt.colorbar(im)
     plt.axhline(y=num_bands-0.5,color='k')
     plt.axhline(y=num_bands*2-0.5,color='k')
@@ -226,6 +226,6 @@ def Plot_Hamiltonian():
 
 
 plt.close("all")
-Plot_CB_Surf('HfS2_IBZ_bands.dat',12,18,-2.5834, 6.290339483e-10, 3.631729507E-10)
+Plot_CB_Surf('HfS2_21x21_bands.dat',12,18,-2.5834, 6.290339483e-10, 3.631729507E-10)
 Plot_Bands('HfS2_GXSYG_bands.dat',12,18,-2.5834, 6.290339483e-10, 3.631729507E-10)
 Plot_Hamiltonian()

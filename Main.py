@@ -72,14 +72,14 @@ skip_bands = 12
 
 #Routines to perform
 fit_MLWF = False
-restart = True
+restart = False
 bandgap_correction = True
 
 #Learning Parameters
 learn_rate = 0.005
 regularization_factor = 1e-5 #controls sparcity. Adjust as needed.
 converge_target = 7e-5
-max_iter = 1
+max_iter = 2
 
 #Parameters for Testing
 fit_bands = True 

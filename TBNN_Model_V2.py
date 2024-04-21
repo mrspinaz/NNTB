@@ -297,13 +297,13 @@ class TBNN_V2:
                 E_tb_pred = self.Calculate_Energy_Eigenvals(H_trainable, kpoints, nks)
 
                 loss1 = tf.reduce_mean(tf.square(E_tb_pred - truncated_bands))
-
+                
                 loss_reg = 0
                 for i in range(len(H_trainable)):
                     loss_reg += tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[i])))), dtype=tf.float32)
                 loss = loss1 + self.regularization_factor*loss_reg
                 print('Iteration: ', count,' Loss: ' , (loss).numpy())
-            
+
             grad = tape.gradient(loss, H_trainable)
             grad_real = tf.cast(tf.math.real(grad), dtype=tf.complex64)
             

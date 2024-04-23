@@ -64,33 +64,48 @@ class TBNN_V2:
         ky_factor = self.a/self.b
         kpoints[0,:] =  (kpoints[0,:])*(2.0*np.pi/self.a)
         kpoints[1,:] =  (kpoints[1,:]/ky_factor)*(2.0*np.pi/self.b)
+
+        first_eigval_set = truncated_bands[1,:]
+        pos_eigvals = [a for a in first_eigval_set if a> 0]
+        neg_eigvals = [a for a in first_eigval_set if a < 0]
+
+        pos_smallest = min(pos_eigvals, key=abs)
+        neg_smallest = min(neg_eigvals, key=abs)
+        c = int(np.where(first_eigval_set == pos_smallest)[0])
+        v = int(np.where(first_eigval_set == neg_smallest)[0])
+
+        conduction_band = truncated_bands[:,c]
+        valence_band = truncated_bands[:,v]
+
+        bandgap = np.min(conduction_band) - np.max(valence_band)
         
 
+        #Additional energy shift applied to position Ef at midgap
+        cb_shift = abs(abs(np.min(conduction_band)) - bandgap/2.0)
+        vb_shift = abs(abs(np.max(valence_band)) - bandgap/2.0)
+        print(cb_shift, " ", vb_shift)
+        if( abs(np.min(conduction_band)) < abs(np.max(valence_band))):
+            truncated_bands[:,c:] += cb_shift
+            truncated_bands[:,0:v+1] += vb_shift
+        else:
+            truncated_bands[:,c:] -= cb_shift
+            truncated_bands[:,0:v+1] -= vb_shift
 
+
+        #Ec and Ev should have the same magnitude
+        print("Ec = " , np.min(truncated_bands[:,c])  , "Ev = " , np.max(truncated_bands[:,v]))
         
         if(self.adjust_bandgap):
-            first_eigval_set = truncated_bands[1,:]
-            pos_eigvals = [a for a in first_eigval_set if a> 0]
-            neg_eigvals = [a for a in first_eigval_set if a < 0]
 
-            pos_smallest = min(pos_eigvals, key=abs)
-            neg_smallest = min(neg_eigvals, key=abs)
-            c = int(np.where(first_eigval_set == pos_smallest)[0])
-            v = int(np.where(first_eigval_set == neg_smallest)[0])
-
-            conduction_band = truncated_bands[:,c]
-            valence_band = truncated_bands[:,v]
-
-            bandgap = np.min(conduction_band) - np.max(valence_band)
-            #print("Ec = " , np.min(conduction_band) , "Ev = " , np.max(valence_band))
             bandgap_shift = self.experimental_bandgap - bandgap
             
-            truncated_bands[:,c:-1] += bandgap_shift/2
+            truncated_bands[:,c:] += bandgap_shift/2
             truncated_bands[:,0:v+1] -= bandgap_shift/2
 
+            
             #For testing
-            new_conduction_band = truncated_bands[:,c]
-            new_valence_band = truncated_bands[:,v]
+            #new_conduction_band = truncated_bands[:,c]
+            #new_valence_band = truncated_bands[:,v]
             #print("Ec = " , np.min(new_conduction_band) , "Ev = " , np.max(new_valence_band))
 
         
@@ -229,7 +244,7 @@ class TBNN_V2:
         
         #For export to NEGF
         H_oneside = self.H_final[0:5] #5 is hard-coded for nearest neighbour.
-        print()
+        
         H_save = np.zeros((H_trainable[0].shape[1]**2, 5))
         for i,mat in enumerate(H_oneside):
             flat_mat = np.real(mat.flatten('F')) #Flatten in column-major order.
@@ -254,7 +269,7 @@ class TBNN_V2:
         print("Ec = " , np.min(conduction_band) , "Ev = " , np.max(valence_band))
         bandgap_shift = self.experiemental_bandgap - bandgap
         
-        extracted_bands[:,c:-1] += bandgap_shift/2
+        extracted_bands[:,c:] += bandgap_shift/2
         extracted_bands[:,0:v+1] -= bandgap_shift/2
 
         #For testing
@@ -305,6 +320,7 @@ class TBNN_V2:
                 print('Iteration: ', count,' Loss: ' , (loss).numpy())
 
             grad = tape.gradient(loss, H_trainable)
+            
             grad_real = tf.cast(tf.math.real(grad), dtype=tf.complex64)
             
 
@@ -340,8 +356,7 @@ class TBNN_V2:
             sym_grad.append(tf.transpose(grad_real[3]))
             sym_grad.append(tf.transpose(grad_real[4]))
             sym_grad_tens = tf.stack(sym_grad)
-        
-
+            
             opt.apply_gradients(zip(sym_grad_tens, H_trainable))
             loss_list.append(loss)
             count+=1

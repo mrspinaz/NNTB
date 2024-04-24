@@ -77,9 +77,9 @@ bandgap_correction = True
 
 #Learning Parameters
 learn_rate = 0.005
-regularization_factor = 1e-4 #Controls Hamiltonian sparsity. Adjust as needed.
-converge_target = 7e-5
-max_iter = 300
+regularization_factor = 1e-5 #Controls Hamiltonian sparsity. Adjust as needed.
+converge_target = 1e-5
+max_iter = 400
 
 def main():
     tbnn2 = TBNN_V2(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor , bands_filename, output_hamiltonian_name, bandgap_correction, experimental_bandgap)

@@ -63,10 +63,10 @@ a = 6.290339483e-10
 b = 3.631729507E-10
 
 #Band Structure
-bands_filename = 'HfS2_21x21_bands.dat'
+bands_filename = 'HfS2_31x31_bands.dat'
 output_hamiltonian_name = 'HfS2_SmallGamma_FullIBZFit.dat'
 Ef = -3.3312 #-2.5 - 0.126
-experimental_bandgap = 1.8858 #[eV]
+experimental_bandgap = 1.5419 #[eV]
 target_bands = 18 
 skip_bands = 12
 
@@ -79,7 +79,7 @@ bandgap_correction = True
 learn_rate = 0.005
 regularization_factor = 1e-5 #Controls Hamiltonian sparsity. Adjust as needed.
 converge_target = 1e-5
-max_iter = 400
+max_iter = 600
 
 def main():
     tbnn2 = TBNN_V2(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor , bands_filename, output_hamiltonian_name, bandgap_correction, experimental_bandgap)

@@ -97,12 +97,12 @@ def Plot_CB_Surf(bands_filename, skip_bands, target_bands, Ef, a, b):
     nks = len(kpoints[0,:])
 
     kx_plot = kx.reshape(int(np.sqrt(nks)),int(np.sqrt(nks)))*(a/(2*np.pi))
-    ky_plot = ky.reshape(11,11)*(b/(2*np.pi))
+    ky_plot = ky.reshape(31,31)*(b/(2*np.pi))
     #Z2 = truncated_bands[:,12].reshape(len(kx),len(ky))
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    print("Valence: ", truncated_bands[(np.abs(truncated_bands[:,11] - 0)).argmin(),11])
-    print("Conduction: ", truncated_bands[(np.abs(truncated_bands[:,12] - 0)).argmin(),12])
+    print("Valence: ", truncated_bands[(np.abs(truncated_bands[:,11] - Ef)).argmin(),11])
+    print("Conduction: ", truncated_bands[(np.abs(truncated_bands[:,12] - Ef)).argmin(),12])
 
 
     ax.plot_surface(kx_plot,ky_plot,truncated_bands[:,11].reshape(len(kx_plot),len(ky_plot)), color='blue')
@@ -149,7 +149,7 @@ def Plot_Bands(bands_filename, skip_bands, target_bands, Ef, a, b):
     nband, nks, truncated_bands, kpoints = Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b)
 
     adjust_bandgap = True
-    experimental_bandgap = 1.8858
+    experimental_bandgap = 1.5419
     if(adjust_bandgap):
         first_eigval_set = truncated_bands[1,:]
         pos_eigvals = [a for a in first_eigval_set if a> 0]
@@ -257,6 +257,6 @@ def Plot_Hamiltonian():
 
 #old fermi was -2.5834
 plt.close("all")
-Plot_CB_Surf('HfS2_21x21_bands.dat',12,18, 0.6866, 6.290339483e-10, 3.631729507E-10)
+Plot_CB_Surf('HfS2_31x31_bands.dat',12,18, -2.5834 , 6.290339483e-10, 3.631729507E-10)
 Plot_Bands('HfS2_GXSYG_bands.dat',12,18, -2.5834, 6.290339483e-10, 3.631729507E-10)
 Plot_Hamiltonian()

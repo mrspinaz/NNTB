@@ -143,6 +143,137 @@ def Plot_CB_Surf(bands_filename, skip_bands, target_bands, Ef, a, b):
     ax.set_zlabel('E [eV]')
     plt.show()
 
+def Compare_TB_Bands(hamiltonian_filename,a,b):
+
+
+    file_name = hamiltonian_filename
+    data = np.loadtxt(file_name)
+    num_neighbours = int(len(data[0,:]))
+    dim = int(np.sqrt(len(data[:,0])))
+    if(num_neighbours == 5):
+        #nearest neighbour
+        alpha = np.reshape(data[:,0],(dim,dim))
+        beta = np.reshape(data[:,1],(dim,dim))
+        gamma = np.reshape(data[:,2],(dim,dim))
+        delta11 = np.reshape(data[:,3],(dim,dim))
+        delta1_min_1 = np.reshape(data[:,4],(dim,dim))
+
+    
+    ml_ham = Load_Hamiltonian()
+    ml_alpha = ml_ham[0]
+    ml_beta = ml_ham[1]
+    ml_gamma = ml_ham[2]
+    ml_delta11 = ml_ham[3]
+    ml_delta1_min1 = ml_ham[4]
+
+    ml_beta_dagger = ml_ham[5]
+    ml_gamma_dagger = ml_ham[6]
+    ml_delta11_dagger = ml_ham[7]
+    ml_delta1_min1_dagger = ml_ham[8]
+
+    surface_plot = False
+    if(surface_plot == True):
+
+
+        grid_density = 30
+        kxx = np.linspace(0,np.pi/a,grid_density)
+        kyy = np.linspace(0,np.pi/b,grid_density)
+        xx,yy = np.meshgrid(kxx,kyy)
+
+        nks = grid_density**2
+        kpoints = np.zeros((2,nks))
+        count = 0
+        for row in range(grid_density):
+            for col in range(grid_density):
+                kpoints[0,count] =  xx[row,col]
+                kpoints[1,count] =  yy[row,col]
+                count += 1
+
+        mat_dims = np.shape(alpha)
+        E = np.zeros((len(kpoints[0]),mat_dims[0]))
+        ml_E = np.zeros((len(kpoints[0]),ml_alpha.shape[0]))
+        for ii in range(len(kpoints[0])):
+            H = alpha + beta*np.exp(1j*kpoints[0][ii]*a) + gamma*np.exp(1j*kpoints[1][ii]*b) + \
+                delta11*np.exp(1j*kpoints[0][ii]*a + 1j*kpoints[1][ii]*b) + delta1_min_1*np.exp(1j*kpoints[0][ii]*a - 1j*kpoints[1][ii]*b) + \
+                (beta*np.exp(1j*kpoints[0][ii]*a) + gamma*np.exp(1j*kpoints[1][ii]*b) + \
+                delta11*np.exp(1j*kpoints[0][ii]*a + 1j*kpoints[1][ii]*b) + delta1_min_1*np.exp(1j*kpoints[0][ii]*a - 1j*kpoints[1][ii]*b)).conj().T
+            eigvals, eigvecs = np.linalg.eig(H)
+            E[ii,:] = np.sort((eigvals))
+
+            H2 = ml_alpha + ml_beta*np.exp(1j*kpoints[0][ii]*a) + ml_gamma*np.exp(1j*kpoints[1][ii]*b) + \
+                ml_delta11*np.exp(1j*kpoints[0][ii]*a + 1j*kpoints[1][ii]*b) + ml_delta1_min1*np.exp(1j*kpoints[0][ii]*a - 1j*kpoints[1][ii]*b) + \
+                ml_beta_dagger*np.exp(-1j*kpoints[0][ii]*a) + ml_gamma_dagger*np.exp(-1j*kpoints[1][ii]*b) + \
+                ml_delta11_dagger*np.exp(-1j*kpoints[0][ii]*a - 1j*kpoints[1][ii]*b) + ml_delta1_min1_dagger*np.exp(-1j*kpoints[0][ii]*a + 1j*kpoints[1][ii]*b)
+            
+            ml_eigvals, eigvecs = np.linalg.eig(H2)
+
+            ml_E[ii,:] = np.sort((ml_eigvals))
+
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        print(yy.shape)
+        ax.plot_surface(xx,yy,E[:,0].reshape(grid_density,grid_density),color='blue')
+        ax.plot_surface(xx,yy,E[:,1].reshape(grid_density,grid_density),color='blue')
+        ax.plot_surface(xx,yy,E[:,2].reshape(grid_density,grid_density),color='blue')
+        ax.plot_surface(xx,yy,E[:,3].reshape(grid_density,grid_density),color='blue')
+
+        ax.scatter(xx,yy,ml_E[:,0].reshape(grid_density,grid_density),color='red')
+        ax.scatter(xx,yy,ml_E[:,1].reshape(grid_density,grid_density),color='red')
+        ax.scatter(xx,yy,ml_E[:,2].reshape(grid_density,grid_density),color='red')
+        ax.scatter(xx,yy,ml_E[:,3].reshape(grid_density,grid_density),color='red')
+        plt.show()
+
+
+    else:
+        nks = 200
+        nk_segement = int(((nks-1))/4)
+
+        kx_GX = np.linspace(0,np.pi/a, nk_segement)
+        ky_GX = np.linspace(0,0, nk_segement)
+
+        kx_XS = np.linspace(np.pi/a,np.pi/a, nk_segement)
+        ky_XS = np.linspace(0,np.pi/(b), nk_segement)
+
+        kx_SY = np.linspace(np.pi/a,0, nk_segement)
+        ky_SY = np.linspace(np.pi/b,np.pi/b, nk_segement)
+
+        kx_YG = np.linspace(0,0, nk_segement)
+        ky_YG = np.linspace(np.pi/b,0, nk_segement)
+
+        kx_IBZ = np.concatenate((kx_GX,kx_XS,kx_SY,kx_YG), axis=None)
+        ky_IBZ = np.concatenate((ky_GX,ky_XS,ky_SY,ky_YG), axis=None)
+
+        kpoints = np.zeros((2,len(kx_IBZ)))
+        kpoints[0,:] = kx_IBZ
+        kpoints[1,:] = ky_IBZ
+
+        mat_dims = np.shape(alpha)
+        E = np.zeros((len(kpoints[0]),mat_dims[0]))
+        ml_E = np.zeros((len(kpoints[0]),ml_alpha.shape[0]))
+        for ii in range(len(kpoints[0])):
+            H = alpha + beta*np.exp(1j*kpoints[0][ii]*a) + gamma*np.exp(1j*kpoints[1][ii]*b) + \
+                delta11*np.exp(1j*kpoints[0][ii]*a + 1j*kpoints[1][ii]*b) + delta1_min_1*np.exp(1j*kpoints[0][ii]*a - 1j*kpoints[1][ii]*b) + \
+                (beta*np.exp(1j*kpoints[0][ii]*a) + gamma*np.exp(1j*kpoints[1][ii]*b) + \
+                delta11*np.exp(1j*kpoints[0][ii]*a + 1j*kpoints[1][ii]*b) + delta1_min_1*np.exp(1j*kpoints[0][ii]*a - 1j*kpoints[1][ii]*b)).conj().T
+            eigvals, eigvecs = np.linalg.eig(H)
+            E[ii,:] = np.sort((eigvals))
+
+            H2 = ml_alpha + ml_beta*np.exp(1j*kpoints[0][ii]*a) + ml_gamma*np.exp(1j*kpoints[1][ii]*b) + \
+                ml_delta11*np.exp(1j*kpoints[0][ii]*a + 1j*kpoints[1][ii]*b) + ml_delta1_min1*np.exp(1j*kpoints[0][ii]*a - 1j*kpoints[1][ii]*b) + \
+                ml_beta_dagger*np.exp(-1j*kpoints[0][ii]*a) + ml_gamma_dagger*np.exp(-1j*kpoints[1][ii]*b) + \
+                ml_delta11_dagger*np.exp(-1j*kpoints[0][ii]*a - 1j*kpoints[1][ii]*b) + ml_delta1_min1_dagger*np.exp(-1j*kpoints[0][ii]*a + 1j*kpoints[1][ii]*b)
+            
+            ml_eigvals, eigvecs = np.linalg.eig(H2)
+
+            ml_E[ii,:] = np.sort((ml_eigvals))
+        
+        xvals = np.linspace(0,1,len(kx_IBZ))
+        plt.plot(xvals, E,'b')
+        plt.plot(xvals, ml_E, 'r--')
+        plt.show()
+    
+
 
 def Plot_Bands(bands_filename, skip_bands, target_bands, Ef, a, b):
 
@@ -257,6 +388,8 @@ def Plot_Hamiltonian():
 
 #old fermi was -2.5834
 plt.close("all")
-Plot_CB_Surf('HfS2_31x31_bands.dat',12,18, -2.5834 , 6.290339483e-10, 3.631729507E-10)
-Plot_Bands('HfS2_GXSYG_bands.dat',12,18, -2.5834, 6.290339483e-10, 3.631729507E-10)
+#Plot_CB_Surf('HfS2_31x31_bands.dat',12,18, -2.5834 , 6.290339483e-10, 3.631729507E-10)
+#Plot_Bands('HfS2_GXSYG_bands.dat',12,18, -2.5834, 6.290339483e-10, 3.631729507E-10)
+#Plot_Hamiltonian()
+Compare_TB_Bands('inputs/BP/BP.dat',4.43e-10,3.27e-10)
 Plot_Hamiltonian()

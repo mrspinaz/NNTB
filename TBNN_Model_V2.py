@@ -61,9 +61,9 @@ class TBNN_V2:
         file.close()
 
         #Convert k_points to their actual values
-        ky_factor = self.a/self.b
+        k_factor = self.a/self.b
         kpoints[0,:] =  (kpoints[0,:])*(2.0*np.pi/self.a)
-        kpoints[1,:] =  (kpoints[1,:]/ky_factor)*(2.0*np.pi/self.b)
+        kpoints[1,:] =  (kpoints[1,:]/k_factor)*(2.0*np.pi/self.b)
 
         first_eigval_set = truncated_bands[1,:]
         pos_eigvals = [a for a in first_eigval_set if a> 0]
@@ -182,6 +182,77 @@ class TBNN_V2:
         
         return H_trainable
     
+    def extract_tb_eigenvals(self,hamiltonian_filename):
+        """ This function is to be used for fitting to an existing TB model.
+            Primarily for testing purposes. It requires a hamiltonian in the form our NEGF code uses."""
+        file_name = hamiltonian_filename
+        data = np.loadtxt(file_name)
+        a = self.a 
+        b = self.b
+
+        #testing setting small elements of hamiltonian to zero
+        #data = self.zero_bands(data,hamiltonian_filename)
+        num_neighbours = int(len(data[0,:]))
+        dim = int(np.sqrt(len(data[:,0])))
+        
+        if(num_neighbours == 5):
+            #nearest neighbour
+            alpha = np.reshape(data[:,0],(dim,dim))
+            beta = np.reshape(data[:,1],(dim,dim))
+            gamma = np.reshape(data[:,2],(dim,dim))
+            delta11 = np.reshape(data[:,3],(dim,dim))
+            delta1_min_1 = np.reshape(data[:,4],(dim,dim))
+            tb = [alpha, beta, gamma, delta11,delta1_min_1]
+        elif(num_neighbours == 8):
+            #second nearest neighbour
+            alpha = np.reshape(data[:,0],(dim,dim))
+            beta = np.reshape(data[:,1],(dim,dim))
+            gamma1 = np.reshape(data[:,2],(dim,dim))
+            gamma2 = np.reshape(data[:,3], (dim,dim))
+            delta11 = np.reshape(data[:,4],(dim,dim))
+            delta12 = np.reshape(data[:,5],(dim,dim))
+            delta21 = np.reshape(data[:,6],(dim,dim))
+            delta22 = np.reshape(data[:,7],(dim,dim))
+            tb = [alpha,beta,gamma1,gamma2,delta11,delta12,delta21,delta22]
+
+
+        #Creating kpath
+        grid_density = 30
+        kx = np.linspace(0,np.pi/a,grid_density)
+        ky = np.linspace(0,np.pi/b,grid_density)
+        xx,yy = np.meshgrid(kx,ky)
+
+        nks = grid_density**2
+        kpoints = np.zeros((2,nks))
+        count = 0
+        for row in range(grid_density):
+            for col in range(grid_density):
+                kpoints[0,count] =  xx[row,col]
+                kpoints[1,count] =  yy[row,col]
+                count += 1
+
+
+        mat_dims = np.shape(tb[1])
+
+        E = np.zeros((nks,mat_dims[0]))
+
+
+        if(len(tb) == 5):
+            for ii in range(len(kpoints[0])):
+                H = tb[0] + tb[1]*np.exp(1j*kpoints[0][ii]*a) + tb[2]*np.exp(1j*kpoints[1][ii]*b) + \
+                    tb[3]*np.exp(1j*kpoints[0][ii]*a + 1j*kpoints[1][ii]*b) + tb[4]*np.exp(1j*kpoints[0][ii]*a - 1j*kpoints[1][ii]*b) + \
+                    (tb[1]*np.exp(1j*kpoints[0][ii]*a) + tb[2]*np.exp(1j*kpoints[1][ii]*b) + \
+                    tb[3]*np.exp(1j*kpoints[0][ii]*a + 1j*kpoints[1][ii]*b) + tb[4]*np.exp(1j*kpoints[0][ii]*a - 1j*kpoints[1][ii]*b)).conj().T
+                    
+                eigvals, eigvecs = np.linalg.eig(H)
+                E[ii,:] = np.sort((eigvals))
+        
+
+        E = tf.convert_to_tensor(E, dtype=tf.float32)
+        kpoints = tf.convert_to_tensor(kpoints, dtype=tf.complex64)
+
+        return E, kpoints, nks
+    
 
     def Calculate_Energy_Eigenvals(self, H_train, kpoints, nks):
 
@@ -289,7 +360,8 @@ class TBNN_V2:
             
 
         #abinit_bands and kpoints are already tensor objects
-        nband, nks, truncated_bands, kpoints = self._Extract_Abinit_Eigvals(self.bands_filename)
+        #nband, nks, truncated_bands, kpoints = self._Extract_Abinit_Eigvals(self.bands_filename)
+        E_tb, kpoints, nks = self.extract_tb_eigenvals(self.bands_filename)
         
         #initialize Hamiltonian
         if(self.restart):
@@ -311,7 +383,7 @@ class TBNN_V2:
                 
                 E_tb_pred = self.Calculate_Energy_Eigenvals(H_trainable, kpoints, nks)
 
-                loss1 = tf.reduce_mean(tf.square(E_tb_pred - truncated_bands))
+                loss1 = tf.reduce_mean(tf.square(E_tb_pred - E_tb))
                 
                 loss_reg = 0
                 for i in range(len(H_trainable)):

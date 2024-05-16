@@ -59,27 +59,27 @@ Files: Your_Hamiltonian.dat <-- use this for NEGF code. Found in the H_output fo
 '''
 
 #Cell Dimensions
-a = 6.290339483e-10
-b = 3.631729507E-10
+a = 4.43e-10
+b = 3.27e-10
 
 #Band Structure
-bands_filename = 'HfS2_31x31_bands.dat'
-output_hamiltonian_name = 'HfS2_SmallGamma_FullIBZFit.dat'
+bands_filename = 'inputs/BP/BP.dat'
+output_hamiltonian_name = 'BP_fitting.dat'
 Ef = -3.3312 #-2.5 - 0.126
-experimental_bandgap = 1.5419 #[eV]
-target_bands = 18 
-skip_bands = 12
+experimental_bandgap = 1.52 #[eV]
+target_bands = 4 
+skip_bands = 0
 
 #Routines to perform
 fit_MLWF = False
-restart = True
-bandgap_correction = True
+restart = False
+bandgap_correction = False
 
 #Learning Parameters
 learn_rate = 0.005
-regularization_factor = 1e-5 #Controls Hamiltonian sparsity. Adjust as needed.
+regularization_factor = 1e-3 #Controls Hamiltonian sparsity. Adjust as needed.
 converge_target = 1e-5
-max_iter = 600
+max_iter = 2000
 
 def main():
     tbnn2 = TBNN_V2(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor , bands_filename, output_hamiltonian_name, bandgap_correction, experimental_bandgap)

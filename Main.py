@@ -72,14 +72,14 @@ skip_bands = 0
 
 #Routines to perform
 fit_MLWF = False
-restart = False
+restart = True 
 bandgap_correction = False
 
 #Learning Parameters
-learn_rate = 0.005
-regularization_factor = 1e-3 #Controls Hamiltonian sparsity. Adjust as needed.
+learn_rate = 0.01
+regularization_factor = 1e-4 #Controls Hamiltonian sparsity. Adjust as needed.
 converge_target = 1e-5
-max_iter = 2000
+max_iter = 800
 
 def main():
     tbnn2 = TBNN_V2(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor , bands_filename, output_hamiltonian_name, bandgap_correction, experimental_bandgap)

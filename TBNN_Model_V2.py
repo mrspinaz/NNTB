@@ -217,7 +217,7 @@ class TBNN_V2:
 
 
         #Creating kpath
-        grid_density = 30
+        grid_density = 20
         kx = np.linspace(0,np.pi/a,grid_density)
         ky = np.linspace(0,np.pi/b,grid_density)
         xx,yy = np.meshgrid(kx,ky)

@@ -2,6 +2,7 @@ import re
 import os
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 class TBNN_V2:
     #Maybe change code at some point to extract these from scf, bands, etc output files, other than boolean commands.
@@ -83,7 +84,7 @@ class TBNN_V2:
         #Additional energy shift applied to position Ef at midgap
         cb_shift = abs(abs(np.min(conduction_band)) - bandgap/2.0)
         vb_shift = abs(abs(np.max(valence_band)) - bandgap/2.0)
-        print(cb_shift, " ", vb_shift)
+        #print(cb_shift, " ", vb_shift)
         if( abs(np.min(conduction_band)) < abs(np.max(valence_band))):
             truncated_bands[:,c:] += cb_shift
             truncated_bands[:,0:v+1] += vb_shift
@@ -93,7 +94,7 @@ class TBNN_V2:
 
 
         #Ec and Ev should have the same magnitude
-        print("Ec = " , np.min(truncated_bands[:,c])  , "Ev = " , np.max(truncated_bands[:,v]))
+        #print("Ec = " , np.min(truncated_bands[:,c])  , "Ev = " , np.max(truncated_bands[:,v]))
         
         if(self.adjust_bandgap):
 
@@ -278,6 +279,114 @@ class TBNN_V2:
         print("Ec = " , np.min(new_conduction_band) , "Ev = " , np.max(new_valence_band))
 
 
+
+    def Load_Hamiltonian(self):
+
+        alpha = np.real(np.loadtxt('H_output/alpha.txt', dtype=complex))
+        beta = np.loadtxt('H_output/beta.txt', dtype=complex)
+        gamma = np.loadtxt('H_output/gamma.txt', dtype=complex)
+        delta11 = np.loadtxt('H_output/delta11.txt', dtype=complex)
+        delta1_min1 = np.loadtxt('H_output/delta1_min1.txt', dtype=complex)
+
+        beta_dagger = np.loadtxt('H_output/beta_dagger.txt', dtype=complex)
+        gamma_dagger = np.loadtxt('H_output/gamma_dagger.txt', dtype=complex)
+        delta11_dagger = np.loadtxt('H_output/delta11_dagger.txt', dtype=complex)
+        delta1_min1_dagger = np.loadtxt('H_output/delta1_min1_dagger.txt', dtype=complex)
+
+        Hamiltonian = [alpha, beta, gamma, delta11, delta1_min1, beta_dagger, gamma_dagger, delta11_dagger, delta1_min1_dagger]
+
+        return Hamiltonian
+    
+
+
+    def plot_bands(self, iteration):
+        nband, nks, truncated_bands, kpoints = self._Extract_Abinit_Eigvals('HfS2_GXSYG_bands.dat')
+        kpoints = kpoints.numpy()
+        kx = kpoints[0,:]
+        ky = kpoints[1,:]
+
+        hamiltonian = self.Load_Hamiltonian()
+        alpha = hamiltonian[0]
+        beta = hamiltonian[1]
+        gamma = hamiltonian[2]
+        delta11 = hamiltonian[3]
+        delta1_min1 = hamiltonian[4]
+
+        beta_dagger = hamiltonian[5]
+        gamma_dagger = hamiltonian[6]
+        delta11_dagger = hamiltonian[7]
+        delta1_min1_dagger = hamiltonian[8]
+
+        E = np.zeros((self.target_bands,len(kx)))
+        for ii in range(len(kx)):
+            H = alpha + beta*np.exp(1j*kx[ii]*self.a) + gamma*np.exp(1j*ky[ii]*self.b) + \
+                delta11*np.exp(1j*kx[ii]*self.a + 1j*ky[ii]*self.b) + delta1_min1*np.exp(1j*kx[ii]*self.a - 1j*ky[ii]*self.b) + \
+                beta_dagger*np.exp(-1j*kx[ii]*self.a) + gamma_dagger*np.exp(-1j*ky[ii]*self.b) + \
+                delta11_dagger*np.exp(-1j*kx[ii]*self.a - 1j*ky[ii]*self.b) + delta1_min1_dagger*np.exp(-1j*kx[ii]*self.a + 1j*ky[ii]*self.b)
+            eigvals, eigvecs = np.linalg.eig(H)
+
+            E[:,ii] = np.sort((eigvals.T))
+
+        fig = plt.figure()
+        x_vals = np.linspace(0,1,len(kx))
+        plt.xticks([0, 0.25, 0.5, 0.75, 1.0], ['$\Gamma$', 'X', 'S', 'Y', '$\Gamma$'])
+        plt.ylabel("E [eV]")
+        plt.ylim([-6,6])
+        plt.plot(x_vals, truncated_bands,'r')
+        plt.plot(x_vals,E.T,'b--')
+        offset = 500
+        plt.title('Iteration ' + str(iteration + offset))
+        save_str = 'gif_band_plots/' + str(iteration + offset) + '.png'
+        fig.savefig(save_str)
+    
+    def plot_hamiltonian(self, iteration):
+        hamiltonian = self.Load_Hamiltonian()
+
+
+        num_bands = hamiltonian[0].shape[1]
+
+        #Plotting matrix elements 
+        H_map = np.zeros((num_bands*3,num_bands*3))
+        #Delta1_min1_dagger
+        H_map[:num_bands, :num_bands] = hamiltonian[8]
+
+        #Beta_dagger
+        H_map[num_bands:num_bands*2, :num_bands] = hamiltonian[5]
+
+        #Delta11_dagger
+        H_map[num_bands*2:num_bands*3, :num_bands] = hamiltonian[7]
+
+        #Gamma
+        H_map[:num_bands, num_bands:num_bands*2] = hamiltonian[2]
+
+        #Alpha
+        H_map[num_bands:num_bands*2, num_bands:num_bands*2] = hamiltonian[0]
+
+        #Gamma_dagger
+        H_map[num_bands*2:num_bands*3, num_bands:num_bands*2] = hamiltonian[6]
+
+        #Delta11
+        H_map[:num_bands, num_bands*2:num_bands*3] = hamiltonian[3]
+
+        #Beta
+        H_map[num_bands:num_bands*2, num_bands*2:num_bands*3] = hamiltonian[1]
+
+        #Delta1_min1
+        H_map[num_bands*2:num_bands*3, num_bands*2:num_bands*3] = hamiltonian[4]
+
+
+        fig, ax = plt.subplots()
+        im = plt.imshow(np.real(H_map), cmap="seismic",vmin=-3, vmax=3)
+        fig.colorbar(im)
+        ax.title.set_text('Iteration ' + str(iteration))
+        ax.axhline(y=num_bands-0.5,color='k')
+        ax.axhline(y=num_bands*2-0.5,color='k')
+        ax.axvline(x=num_bands-0.5,color='k')
+        ax.axvline(x=num_bands*2-0.5,color='k')
+        ax.axis('off')
+        fig.savefig('gif_plots/ham_' + str(iteration) + '.png')
+    
+
     def fit_bands(self):
         """ 
         This fuction is for training the bands from randomly generated Hamiltonian.
@@ -359,7 +468,18 @@ class TBNN_V2:
             
             opt.apply_gradients(zip(sym_grad_tens, H_trainable))
             loss_list.append(loss)
+
+            self._Save_Output(H_trainable)
+
+            if(count % 10 == 0):
+                print("PLOTTING BANDS")
+                #self.plot_bands(count)
+                self.plot_hamiltonian(count)
+
+
             count+=1
+
+
 
         if count == self.max_iter:
             print('Max iterations reached.')

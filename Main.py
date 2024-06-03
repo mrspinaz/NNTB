@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from TBNN_Model import TBNN
+#from TBNN_Model import TBNN
 from TBNN_Model_V2 import TBNN_V2
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
@@ -59,25 +59,25 @@ Files: Your_Hamiltonian.dat <-- use this for NEGF code. Found in the H_output fo
 '''
 
 #Cell Dimensions
-a = 6.290339483e-10
-b = 3.631729507E-10
+a = 6.42781064782136e-10
+b = 3.71110682179609e-10
 
 #Band Structure
-bands_filename = 'HfS2_31x31_bands.dat'
-output_hamiltonian_name = 'HfS2_SmallGamma_FullIBZFit.dat'
-Ef = -3.3312 #-2.5 - 0.126
+bands_filename = 'HfSSe_IBZ_bands.dat'
+output_hamiltonian_name = 'HfSSe_SmallGamma_FullIBZFit.dat'
+Ef = -2.5233 #-2.5 - 0.126
 experimental_bandgap = 1.5419 #[eV]
 target_bands = 18 
-skip_bands = 12
+skip_bands = 22
 
 #Routines to perform
 fit_MLWF = False
 restart = True
-bandgap_correction = True
+bandgap_correction = False
 
 #Learning Parameters
 learn_rate = 0.005
-regularization_factor = 1e-5 #Controls Hamiltonian sparsity. Adjust as needed.
+regularization_factor = 5e-6 #Controls Hamiltonian sparsity. Adjust as needed.
 converge_target = 1e-5
 max_iter = 600
 

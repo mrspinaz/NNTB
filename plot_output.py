@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 
+plt.rcParams.update({'font.size': 20})
+
+
 def Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b):
 
         file_dir = 'inputs/' + bands_filename
@@ -148,7 +151,7 @@ def Plot_Bands(bands_filename, skip_bands, target_bands, Ef, a, b):
 
     nband, nks, truncated_bands, kpoints = Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b)
 
-    adjust_bandgap = True
+    adjust_bandgap = False
     experimental_bandgap = 1.5419
     if(adjust_bandgap):
         first_eigval_set = truncated_bands[1,:]
@@ -200,12 +203,15 @@ def Plot_Bands(bands_filename, skip_bands, target_bands, Ef, a, b):
 
         E[:,ii] = np.sort((eigvals.T))
 
-    plt.figure()
+
+    fig = plt.figure()
+    plt.margins(x=0)
     x_vals = np.linspace(0,1,len(kx))
     plt.xticks([0, 0.25, 0.5, 0.75, 1.0], ['$\Gamma$', 'X', 'S', 'Y', '$\Gamma$'])
     plt.ylabel("E [eV]")
-    plt.plot(x_vals, truncated_bands,'r')
-    plt.plot(x_vals,E.T,'b--')
+    plt.plot(x_vals, truncated_bands,'k')
+    plt.plot(x_vals,E.T,'r--')
+    
     plt.show()
 
 def Plot_Hamiltonian():
@@ -257,6 +263,6 @@ def Plot_Hamiltonian():
 
 #old fermi was -2.5834
 plt.close("all")
-Plot_CB_Surf('HfS2_31x31_bands.dat',12,18, -2.5834 , 6.290339483e-10, 3.631729507E-10)
-Plot_Bands('HfS2_GXSYG_bands.dat',12,18, -2.5834, 6.290339483e-10, 3.631729507E-10)
+#Plot_CB_Surf('HfS2_31x31_bands.dat',12,18, -2.5834 , 6.290339483e-10, 3.631729507E-10)
+Plot_Bands('HfSSe_GXSYG_bands.dat',22,18, -2.5233, 6.42781064782136e-10, 3.71110682179609e-10)
 Plot_Hamiltonian()

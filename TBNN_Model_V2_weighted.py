@@ -3,7 +3,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
-class TBNN_V2:
+class TBNN_V2_weighted:
     #Maybe change code at some point to extract these from scf, bands, etc output files, other than boolean commands.
     def __init__(self, a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor ,bands_filename, output_hamiltonian_name, adjust_bandgap, experimental_bandgap):
         self.a = a
@@ -113,7 +113,7 @@ class TBNN_V2:
         truncated_bands = tf.convert_to_tensor(truncated_bands, dtype =tf.float32)
         print("Ec = " , np.min(truncated_bands[:,c])  , "Ev = " , np.max(truncated_bands[:,v]))
         
-        return nband, nks, truncated_bands, kpoints
+        return nband, nks, truncated_bands, kpoints , c, v
     
     def _Initialize_Hamiltonian(self):
 
@@ -147,7 +147,7 @@ class TBNN_V2:
         
         H_trainable = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
 
-        return H_trainable
+        return H_trainable 
 
     def _Reinitialize(self):
         """
@@ -277,7 +277,16 @@ class TBNN_V2:
         new_conduction_band = extracted_bands[:,c]
         new_valence_band = extracted_bands[:,v]
         print("Ec = " , np.min(new_conduction_band) , "Ev = " , np.max(new_valence_band))
-
+    
+    def create_weight_mat(self,c,v):
+        num_cb = self.target_bands - c
+        num_vb = self.target_bands - num_cb
+        cb_weights = np.array([6, 5, 5, 1, 1, 1, 0.001, 0.000, 0.000,0,0])
+        vb_weights = np.array([0, 0.000,0.000, 0.001, 1, 1, 1, 5, 5, 6])
+        band_weights = np.concatenate((vb_weights, cb_weights))
+        print(band_weights)
+        return tf.convert_to_tensor(band_weights, dtype=tf.float32)
+       
 
     def fit_bands(self):
         """ 
@@ -290,7 +299,7 @@ class TBNN_V2:
             
 
         #abinit_bands and kpoints are already tensor objects
-        nband, nks, truncated_bands, kpoints = self._Extract_Abinit_Eigvals(self.bands_filename)
+        nband, nks, truncated_bands, kpoints, c, v = self._Extract_Abinit_Eigvals(self.bands_filename)
         
         #initialize Hamiltonian
         if(self.restart):
@@ -306,13 +315,17 @@ class TBNN_V2:
         loss_list = []
         count = 0
 
+        band_weights = self.create_weight_mat(c,v)
         while(loss > self.converge_target and count < self.max_iter):
             
             with tf.GradientTape() as tape:
                 
                 E_tb_pred = self.Calculate_Energy_Eigenvals(H_trainable, kpoints, nks)
+                
+                diff_tens = tf.square(E_tb_pred - truncated_bands)
+                diff_tens = diff_tens * band_weights
 
-                loss1 = tf.reduce_mean(tf.square(E_tb_pred - truncated_bands))
+                loss1 = tf.reduce_mean(diff_tens)
                 
                 loss_reg = 0
                 for i in range(len(H_trainable)):

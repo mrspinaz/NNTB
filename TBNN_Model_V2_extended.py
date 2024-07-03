@@ -3,7 +3,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
-class TBNN_V2:
+class TBNN_V2_DoubleGamma:
     #Maybe change code at some point to extract these from scf, bands, etc output files, other than boolean commands.
     def __init__(self, a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor ,bands_filename, output_hamiltonian_name, adjust_bandgap, experimental_bandgap):
         self.a = a
@@ -121,31 +121,48 @@ class TBNN_V2:
         #Generated random TB matrix:
         alpha_rand = tf.cast(tf.random.normal([self.target_bands,self.target_bands]),  dtype=tf.complex64)
         beta_rand = tf.cast(tf.random.normal([self.target_bands,self.target_bands]),  dtype=tf.complex64)
+
         gamma_rand = tf.cast(tf.random.normal([self.target_bands,self.target_bands]),  dtype=tf.complex64)
+        gamma2_rand = tf.cast(tf.random.normal([self.target_bands,self.target_bands]),  dtype=tf.complex64)
+
         delta11_rand = tf.cast(tf.random.normal([self.target_bands,self.target_bands]),  dtype=tf.complex64)
         delta1_min1_rand = tf.cast(tf.random.normal([self.target_bands,self.target_bands]),  dtype=tf.complex64)
+
+        delta12_rand = tf.cast(tf.random.normal([self.target_bands,self.target_bands]),  dtype=tf.complex64)
+        delta1_min2_rand = tf.cast(tf.random.normal([self.target_bands,self.target_bands]),  dtype=tf.complex64)
 
         #Ensure the matrix is hermatian
         #A matrix plus it's conjugate transpose is hermatian.
         alpha_rand = alpha_rand + tf.transpose(alpha_rand)
         beta_rand_dagger = tf.transpose(beta_rand)
         gamma_rand_dagger = tf.transpose(gamma_rand)
+        gamma2_rand_dag =  tf.transpose(gamma2_rand)
         delta11_rand_dagger = tf.transpose(delta11_rand)
         delta1_min1_rand_dagger = tf.transpose(delta1_min1_rand)
+
+        delta12_rand_dag = tf.transpose(delta12_rand)
+        delta1_min2_rand_dag = tf.transpose(delta1_min2_rand)
 
         #Combine variables into one list.
         alpha_tensor = tf.Variable(alpha_rand, dtype=tf.complex64)
         beta_tensor = tf.Variable(beta_rand, dtype=tf.complex64)
         gamma_tensor = tf.Variable(gamma_rand, dtype=tf.complex64)
+        gamma2_tensor = tf.Variable(gamma2_rand, dtype=tf.complex64)
         delta11_tensor = tf.Variable(delta11_rand, dtype=tf.complex64)
         delta1_min1_tensor = tf.Variable(delta1_min1_rand, dtype=tf.complex64)
+        delta12_tensor = tf.Variable(delta12_rand, dtype=tf.complex64)
+        delta1_min2_tensor = tf.Variable(delta1_min2_rand, dtype=tf.complex64)
 
         beta_tensor_dagger = tf.Variable(beta_rand_dagger, dtype=tf.complex64)
         gamma_tensor_dagger = tf.Variable(gamma_rand_dagger, dtype=tf.complex64)
+        gamma2_tensor_dagger = tf.Variable(gamma2_rand_dag, dtype=tf.complex64)
         delta11_tensor_dagger = tf.Variable(delta11_rand_dagger, dtype=tf.complex64)
         delta1_min1_tensor_dagger = tf.Variable(delta1_min1_rand_dagger, dtype=tf.complex64)
+        delta12_tensor_dagger = tf.Variable(delta12_rand_dag, dtype=tf.complex64)
+        delta1_min2_tensor_dagger = tf.Variable(delta1_min2_rand_dag, dtype=tf.complex64)
         
-        H_trainable = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
+        H_trainable = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger,
+                       gamma2_tensor, delta12_tensor, delta1_min2_tensor, gamma2_tensor_dagger, delta12_tensor_dagger, delta1_min2_tensor_dagger]
 
         return H_trainable
 
@@ -158,28 +175,42 @@ class TBNN_V2:
         gamma = np.loadtxt('H_output/gamma.txt', dtype=complex)
         delta11 = np.loadtxt('H_output/delta11.txt', dtype=complex)
         delta1_min1 = np.loadtxt('H_output/delta1_min1.txt', dtype=complex)
+
+        gamma2 = np.loadtxt('H_output/gamma2.txt', dtype=complex)
+        delta12 = np.loadtxt('H_output/delta12.txt', dtype=complex)
+        delta1_min2 = np.loadtxt('H_output/delta1_min2.txt', dtype=complex)
         
         alpha = np.diag(np.diag(alpha)) + np.tril(alpha,-1) + np.transpose(np.tril(alpha,-1))
 
         alpha_tensor = tf.convert_to_tensor(alpha, dtype=tf.complex64)
         beta_tensor = tf.convert_to_tensor(beta, dtype=tf.complex64)
         gamma_tensor = tf.convert_to_tensor(gamma, dtype=tf.complex64)
+        gamma2_tensor = tf.convert_to_tensor(gamma2,dtype=tf.complex64)
         delta11_tensor = tf.convert_to_tensor(delta11, dtype=tf.complex64)
         delta1_min1_tensor = tf.convert_to_tensor(delta1_min1, dtype=tf.complex64)
+        delta12_tensor = tf.convert_to_tensor(delta12,dtype=tf.complex64)
+        delta1_min2_tensor = tf.convert_to_tensor(delta1_min2,dtype=tf.complex64)
 
         alpha_tensor = tf.Variable(alpha_tensor, dtype=tf.complex64)
         beta_tensor = tf.Variable(beta_tensor, dtype=tf.complex64)
         gamma_tensor = tf.Variable(gamma_tensor, dtype=tf.complex64)
+        gamma2_tensor = tf.Variable(gamma2_tensor, dtype=tf.complex64)
         delta11_tensor = tf.Variable(delta11_tensor, dtype=tf.complex64)
         delta1_min1_tensor = tf.Variable(delta1_min1_tensor, dtype=tf.complex64)
+        delta12_tensor = tf.Variable(delta12_tensor, dtype=tf.complex64)
+        delta1_min2_tensor = tf.Variable(delta1_min2_tensor, dtype=tf.complex64)
         
-        gamma_tensor = tf.Variable(gamma_tensor, dtype=tf.complex64)
+
         beta_tensor_dagger = tf.Variable(tf.transpose(beta_tensor), dtype=tf.complex64)
         gamma_tensor_dagger = tf.Variable(tf.transpose(gamma_tensor), dtype=tf.complex64)
+        gamma2_tensor_dagger = tf.Variable(tf.transpose(gamma2_tensor), dtype=tf.complex64)
         delta11_tensor_dagger = tf.Variable(tf.transpose(delta11_tensor), dtype=tf.complex64)
         delta1_min1_tensor_dagger = tf.Variable(tf.transpose(delta1_min1_tensor), dtype=tf.complex64)
+        delta12_tensor_dagger = tf.Variable(tf.transpose(delta12_tensor), dtype=tf.complex64)
+        delta1_min2_tensor_dagger = tf.Variable(tf.transpose(delta1_min2_tensor), dtype=tf.complex64)
 
-        H_trainable = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
+        H_trainable = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger,
+                       gamma2_tensor, delta12_tensor, delta1_min2_tensor, gamma2_tensor_dagger, delta12_tensor_dagger, delta1_min2_tensor_dagger]
         
         return H_trainable
     
@@ -196,6 +227,14 @@ class TBNN_V2:
             delta11_dagger = H_train[7]
             delta1_min1_dagger = H_train[8]
 
+            #extended
+            gamma2 = H_train[9]
+            delta12 = H_train[10]
+            delta1_min2 = H_train[11]
+            gamma2_dagger = H_train[12]
+            delta12_dagger = H_train[13]
+            delta1_min2_dagger = H_train[14]
+
            
             E = tf.zeros([nks, self.target_bands], dtype=tf.complex64)
 
@@ -208,7 +247,13 @@ class TBNN_V2:
                     beta_dagger*tf.exp(-1j*kpoints[0][ii]*self.a_tens) + \
                     gamma_dagger*tf.exp(-1j*kpoints[1][ii]*self.b_tens) + \
                     delta11_dagger*tf.exp(-1j*kpoints[0][ii]*self.a_tens - 1j*kpoints[1][ii]*self.b_tens) + \
-                    delta1_min1_dagger*tf.exp(-1j*kpoints[0][ii]*self.a_tens + 1j*kpoints[1][ii]*self.b_tens)
+                    delta1_min1_dagger*tf.exp(-1j*kpoints[0][ii]*self.a_tens + 1j*kpoints[1][ii]*self.b_tens) + \
+                    gamma2*tf.exp(2j*kpoints[1][ii]*self.b_tens) + \
+                    delta12*tf.exp(1j*kpoints[0][ii]*self.a_tens + 2j*kpoints[1][ii]*self.b_tens) + \
+                    delta1_min2*tf.exp(1j*kpoints[0][ii]*self.a_tens - 2j*kpoints[1][ii]*self.b_tens) + \
+                    gamma2_dagger*tf.exp(-2j*kpoints[1][ii]*self.b_tens) + \
+                    delta12_dagger*tf.exp(-1j*kpoints[0][ii]*self.a_tens - 2j*kpoints[1][ii]*self.b_tens) + \
+                    delta1_min2_dagger*tf.exp(-1j*kpoints[0][ii]*self.a_tens + 2j*kpoints[1][ii]*self.b_tens)
                 
                 eigvals, eigvecs = tf.linalg.eig(H) #tf.linalg.eigh(H)
                 eigvals = tf.reshape(eigvals, shape=[1,self.target_bands])
@@ -240,13 +285,21 @@ class TBNN_V2:
         np.savetxt(os.path.join(directory,'delta11_dagger.txt'), H_trainable[7].numpy())
         np.savetxt(os.path.join(directory,'delta1_min1_dagger.txt'), H_trainable[8].numpy())
 
+        #extended
+        np.savetxt(os.path.join(directory,'gamma2.txt'), H_trainable[9].numpy())
+        np.savetxt(os.path.join(directory,'delta12.txt'), H_trainable[10].numpy())
+        np.savetxt(os.path.join(directory,'delta1_min2.txt'), H_trainable[11].numpy())
+        np.savetxt(os.path.join(directory,'gamma2_dagger.txt'), H_trainable[12].numpy())
+        np.savetxt(os.path.join(directory,'delta12_dagger.txt'), H_trainable[13].numpy())
+        np.savetxt(os.path.join(directory,'delta1_min2_dagger.txt'), H_trainable[14].numpy())
+
         #For plotting
-        self.H_final = [H_trainable[0].numpy(), H_trainable[1].numpy(), H_trainable[2].numpy(), H_trainable[3].numpy(), H_trainable[4].numpy(), H_trainable[5].numpy(), H_trainable[6].numpy(), H_trainable[7].numpy(), H_trainable[8].numpy()]
+        self.H_final = [H_trainable[0].numpy(), H_trainable[1].numpy(), H_trainable[2].numpy(), H_trainable[9].numpy(), H_trainable[3].numpy(), H_trainable[10].numpy(), H_trainable[4].numpy(), H_trainable[11].numpy()]
         
         #For export to NEGF
-        H_oneside = self.H_final[0:5] #5 is hard-coded for nearest neighbour.
+        H_oneside = self.H_final #5 is hard-coded for nearest neighbour.
         
-        H_save = np.zeros((H_trainable[0].shape[1]**2, 5))
+        H_save = np.zeros((H_trainable[0].shape[1]**2, 8))
         for i,mat in enumerate(H_oneside):
             flat_mat = np.real(mat.flatten('F')) #Flatten in column-major order.
             H_save[:,i] = flat_mat
@@ -356,6 +409,19 @@ class TBNN_V2:
             sym_grad.append(tf.transpose(grad_real[2]))
             sym_grad.append(tf.transpose(grad_real[3]))
             sym_grad.append(tf.transpose(grad_real[4]))
+
+            #Extended blocks
+            #Gamma2
+            sym_grad.append(grad_real[9])
+            #Delta12
+            sym_grad.append(grad_real[10])
+            #Delta1_min2
+            sym_grad.append(grad_real[11])
+            #Transposed extended blocks
+            sym_grad.append(tf.transpose(grad_real[9]))
+            sym_grad.append(tf.transpose(grad_real[10]))
+            sym_grad.append(tf.transpose(grad_real[11]))
+
             sym_grad_tens = tf.stack(sym_grad)
             
             opt.apply_gradients(zip(sym_grad_tens, H_trainable))

@@ -1,7 +1,8 @@
 import numpy as np
 import tensorflow as tf
-#from TBNN_Model import TBNN
 from TBNN_Model_V2 import TBNN_V2
+from TBNN_Model_V2_extended import TBNN_V2_DoubleGamma
+from TBNN_Model_V2_weighted import TBNN_V2_weighted
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 '''
@@ -59,16 +60,16 @@ Files: Your_Hamiltonian.dat <-- use this for NEGF code. Found in the H_output fo
 '''
 
 #Cell Dimensions
-a = 6.42781064782136e-10
-b = 3.71110682179609e-10
+a = 5.84536306E-10
+b = 4.36037009E-10
 
 #Band Structure
-bands_filename = 'HfSSe_IBZ_bands.dat'
-output_hamiltonian_name = 'HfSSe_SmallGamma_FullIBZFit.dat'
-Ef = -2.5233 #-2.5 - 0.126
-experimental_bandgap = 1.5419 #[eV]
-target_bands = 18 
-skip_bands = 22
+bands_filename = '3L_Te_21x21_bands.dat'
+output_hamiltonian_name = '3L_Te_SingleGamma_FullIBZFit_L2e-5_weighed_21x21_21bands.dat'
+Ef = -0.5292 #-2.5 - 0.126
+experimental_bandgap = 0.74 #[eV]
+target_bands = 21
+skip_bands = 17
 
 #Routines to perform
 fit_MLWF = False
@@ -76,13 +77,19 @@ restart = True
 bandgap_correction = False
 
 #Learning Parameters
-learn_rate = 0.005
-regularization_factor = 5e-6 #Controls Hamiltonian sparsity. Adjust as needed.
+learn_rate = 0.003
+regularization_factor = 2e-5 #Controls Hamiltonian sparsity. Adjust as needed.
 converge_target = 1e-5
 max_iter = 600
 
 def main():
-    tbnn2 = TBNN_V2(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor , bands_filename, output_hamiltonian_name, bandgap_correction, experimental_bandgap)
+    #tbnn2 = TBNN_V2(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor , bands_filename, output_hamiltonian_name, bandgap_correction, experimental_bandgap)
+    #tbnn2.fit_bands()
+
+    #tbnn2 = TBNN_V2_DoubleGamma(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor , bands_filename, output_hamiltonian_name, bandgap_correction, experimental_bandgap)
+    #tbnn2.fit_bands()
+
+    tbnn2 = TBNN_V2_weighted(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor , bands_filename, output_hamiltonian_name, bandgap_correction, experimental_bandgap)
     tbnn2.fit_bands()
 
 if __name__ == '__main__':

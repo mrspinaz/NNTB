@@ -201,8 +201,8 @@ def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
         print("Ec = " , np.min(conduction_band) , "Ev = " , np.max(valence_band))
         bandgap_shift = experimental_bandgap - bandgap
         
-        truncated_bands[:,c:] += bandgap_shift/2
-        truncated_bands[:,0:v+1] -= bandgap_shift/2 + 0.20
+        truncated_bands[:,c:] += bandgap_shift/2 - 0.1
+        truncated_bands[:,0:v+1] -= bandgap_shift/2 + 0.05
 
         #For testing
         new_conduction_band = truncated_bands[:,c]
@@ -328,7 +328,6 @@ def Plot_Hamiltonian(H_filename):
 plt.close("all")
 #Plot_CB_Surf('HfS2_31x31_bands.dat',12,18, -2.5834 , 6.290339483e-10, 3.631729507E-10)
 #Plot_Bands('HfS2_GXSYG_bands.dat',12,18, -2.5834, 6.290339483e-10, 3.631729507E-10)
-Plot_Bands('2L_Te_bands_GXSYG.dat','2L_Te_DoubleGamma_FullIBZFit_L1e-4_21x21_2.dat',12,12, -1.9463, 5.7885636E-10, 4.3185190E-10)
-#Plot_CB_Surf('2L_Te_25x25_bands.dat',12,12, -1.9463, 5.7885636E-10, 4.3185190E-10)
-
-Plot_Hamiltonian('2L_Te_DoubleGamma_FullIBZFit_L1e-4_21x21_2.dat')
+Plot_Bands('3L_Te_GXSYG_bands.dat','3L_Te_DoubleGamma_FullIBZFit_L1e-5_weighted_21x21_27bands_14.dat',9,27,-0.5292, 5.84536306E-10, 4.36037009E-10)
+#Plot_CB_Surf('2L_Te_31x31_bands.dat',12,12, -1.9463, 5.7885636E-10, 4.3185190E-10)
+Plot_Hamiltonian('3L_Te_DoubleGamma_FullIBZFit_L1e-5_weighted_21x21_27bands_14.dat')

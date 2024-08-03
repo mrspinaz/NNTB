@@ -1,0 +1,4 @@
+a = 5.84536306E-10
+b = 4.36037009E-10
+Ef = -0.5292 
+experimental_bandgap = 0.74 #[eV]

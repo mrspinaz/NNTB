@@ -5,7 +5,7 @@ import tensorflow as tf
 
 class TBNN_V2_weighted:
     #Maybe change code at some point to extract these from scf, bands, etc output files, other than boolean commands.
-    def __init__(self, a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor ,bands_filename, output_hamiltonian_name, adjust_bandgap, experimental_bandgap):
+    def __init__(self, a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor ,bands_filename, output_hamiltonian_name, adjust_bandgap, experimental_bandgap,L2_factor,do_threshold,threshold_val, fit_MLWF):
         self.a = a
         self.b = b
         self.a_tens = tf.convert_to_tensor(a,dtype=tf.complex64)
@@ -25,6 +25,11 @@ class TBNN_V2_weighted:
 
         self.adjust_bandgap = adjust_bandgap
         self.experimental_bandgap = experimental_bandgap
+        self.L2_factor = L2_factor
+        self.fit_MLWF = fit_MLWF
+
+        self.do_threshold = do_threshold
+        self.threshold_val = threshold_val
 
     def _Extract_Abinit_Eigvals(self, bands_filename):
 
@@ -148,6 +153,40 @@ class TBNN_V2_weighted:
         H_trainable = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
 
         return H_trainable 
+    
+    def _Initialize_MLWF(self):
+        """
+        Reads initial values from the .dat file output by extractTB2st_biggamma.m script.
+        """
+        #Generated random TB matrix:
+        MLWF_file = np.loadtxt('inputs/3L_Te_Wannier_H.dat')
+        alpha = tf.convert_to_tensor(np.reshape(MLWF_file[:,0], (self.target_bands,self.target_bands)), dtype=tf.complex64 )
+        beta = tf.convert_to_tensor(np.reshape(MLWF_file[:,1], (self.target_bands,self.target_bands)), dtype=tf.complex64 )
+        gamma = tf.convert_to_tensor(np.reshape(MLWF_file[:,2], (self.target_bands,self.target_bands)), dtype=tf.complex64 )
+        delta11 = tf.convert_to_tensor(np.reshape(MLWF_file[:,3], (self.target_bands,self.target_bands)), dtype=tf.complex64 )
+        delta1_min1 = tf.convert_to_tensor(np.reshape(MLWF_file[:,4], (self.target_bands,self.target_bands)), dtype=tf.complex64 )
+
+        beta_dagger = tf.transpose(beta)
+        gamma_dagger = tf.transpose(gamma)
+        delta11_dagger = tf.transpose(delta11)
+        delta1_min1_dagger = tf.transpose(delta1_min1)
+
+        #Combine variables into one list.
+        alpha_tensor = tf.Variable(alpha, dtype=tf.complex64)
+        beta_tensor = tf.Variable(beta, dtype=tf.complex64)
+        gamma_tensor = tf.Variable(gamma, dtype=tf.complex64)
+        delta11_tensor = tf.Variable(delta11, dtype=tf.complex64)
+        delta1_min1_tensor = tf.Variable(delta1_min1, dtype=tf.complex64)
+
+        beta_tensor_dagger = tf.Variable(beta_dagger, dtype=tf.complex64)
+        gamma_tensor_dagger = tf.Variable(gamma_dagger, dtype=tf.complex64)
+        delta11_tensor_dagger = tf.Variable(delta11_dagger, dtype=tf.complex64)
+        delta1_min1_tensor_dagger = tf.Variable(delta1_min1_dagger, dtype=tf.complex64)
+
+        H_trainable = [alpha_tensor, beta_tensor, gamma_tensor, delta11_tensor, delta1_min1_tensor, beta_tensor_dagger, gamma_tensor_dagger, delta11_tensor_dagger, delta1_min1_tensor_dagger]
+        
+        return H_trainable
+        
 
     def _Reinitialize(self):
         """
@@ -240,9 +279,17 @@ class TBNN_V2_weighted:
         np.savetxt(os.path.join(directory,'delta11_dagger.txt'), H_trainable[7].numpy())
         np.savetxt(os.path.join(directory,'delta1_min1_dagger.txt'), H_trainable[8].numpy())
 
+        if(self.do_threshold) == True:
+            #Adding section for zeroing out small weights
+            for i in range(len(H_trainable)):
+                condition = tf.abs(tf.math.real(H_trainable[i])) < self.threshold_val
+                rounded_mat = tf.where(condition, tf.zeros_like(H_trainable[i]), H_trainable[i])
+                H_trainable[i] = rounded_mat
+
         #For plotting
         self.H_final = [H_trainable[0].numpy(), H_trainable[1].numpy(), H_trainable[2].numpy(), H_trainable[3].numpy(), H_trainable[4].numpy(), H_trainable[5].numpy(), H_trainable[6].numpy(), H_trainable[7].numpy(), H_trainable[8].numpy()]
-        
+
+
         #For export to NEGF
         H_oneside = self.H_final[0:5] #5 is hard-coded for nearest neighbour.
         
@@ -281,8 +328,8 @@ class TBNN_V2_weighted:
     def create_weight_mat(self,c,v):
         num_cb = self.target_bands - c
         num_vb = self.target_bands - num_cb
-        cb_weights = np.array([6, 5, 5, 1, 1, 1, 0.001, 0.000, 0.000,0,0])
-        vb_weights = np.array([0, 0.000,0.000, 0.001, 1, 1, 1, 5, 5, 6])
+        cb_weights = np.array([1,1,1,1,1,1,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000])
+        vb_weights = np.array([0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 1, 1, 1, 1])
         band_weights = np.concatenate((vb_weights, cb_weights))
         print(band_weights)
         return tf.convert_to_tensor(band_weights, dtype=tf.float32)
@@ -304,6 +351,8 @@ class TBNN_V2_weighted:
         #initialize Hamiltonian
         if(self.restart):
             H_trainable = self._Reinitialize()
+        elif(self.fit_MLWF):
+            H_trainable = self._Initialize_MLWF()
         else:
             H_trainable = self._Initialize_Hamiltonian()
         
@@ -316,6 +365,7 @@ class TBNN_V2_weighted:
         count = 0
 
         band_weights = self.create_weight_mat(c,v)
+        L1_mats = [0,1,2,3,4,5,6,7,8]
         while(loss > self.converge_target and count < self.max_iter):
             
             with tf.GradientTape() as tape:
@@ -328,9 +378,19 @@ class TBNN_V2_weighted:
                 loss1 = tf.reduce_mean(diff_tens)
                 
                 loss_reg = 0
-                for i in range(len(H_trainable)):
-                    loss_reg += tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[i])))), dtype=tf.float32)
-                loss = loss1 + self.regularization_factor*loss_reg
+                #loss_L2 = 0
+
+                for i in L1_mats:
+                    loss_reg += tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[i])))), dtype=tf.float32) 
+                #alpha_loss_reg = tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[0])))), dtype=tf.float32)
+                #beta_loss_reg = tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[1])))), dtype=tf.float32) 
+                #beta_dag_loss_reg = tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[5])))), dtype=tf.float32) 
+                #gamma_loss_reg = tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[2])))), dtype=tf.float32) 
+                #gamma_dag_loss_reg = tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[6])))), dtype=tf.float32) 
+                #for i in range(len(H_trainable)):
+                #    loss_L2 += tf.cast(tf.reduce_sum(tf.square((tf.math.real(H_trainable[i])))), dtype=tf.float32) 
+
+                loss = loss1 + self.regularization_factor*loss_reg  #1.7e-5*alpha_loss_reg #+ self.L2_factor*loss_L2
                 print('Iteration: ', count,' Loss: ' , (loss).numpy())
 
             grad = tape.gradient(loss, H_trainable)

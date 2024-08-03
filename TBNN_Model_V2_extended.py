@@ -5,7 +5,7 @@ import tensorflow as tf
 
 class TBNN_V2_DoubleGamma:
     #Maybe change code at some point to extract these from scf, bands, etc output files, other than boolean commands.
-    def __init__(self, a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor ,bands_filename, output_hamiltonian_name, adjust_bandgap, experimental_bandgap):
+    def __init__(self, a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor, regularization_factor_ext, bands_filename, output_hamiltonian_name, adjust_bandgap, experimental_bandgap, do_threshold, threshold_val):
         self.a = a
         self.b = b
         self.a_tens = tf.convert_to_tensor(a,dtype=tf.complex64)
@@ -20,11 +20,14 @@ class TBNN_V2_DoubleGamma:
         self.max_iter = max_iter
         self.learn_rate = learn_rate
         self.regularization_factor = regularization_factor
+        self.regularization_factor_ext = regularization_factor_ext
         self.bands_filename = bands_filename
         self.output_hamiltonian_name = output_hamiltonian_name
 
         self.adjust_bandgap = adjust_bandgap
         self.experimental_bandgap = experimental_bandgap
+        self.do_threshold = do_threshold
+        self.threshold_val = threshold_val
 
     def _Extract_Abinit_Eigvals(self, bands_filename):
 
@@ -113,7 +116,7 @@ class TBNN_V2_DoubleGamma:
         truncated_bands = tf.convert_to_tensor(truncated_bands, dtype =tf.float32)
         print("Ec = " , np.min(truncated_bands[:,c])  , "Ev = " , np.max(truncated_bands[:,v]))
         
-        return nband, nks, truncated_bands, kpoints
+        return nband, nks, truncated_bands, kpoints, c,v
     
     def _Initialize_Hamiltonian(self):
 
@@ -293,6 +296,13 @@ class TBNN_V2_DoubleGamma:
         np.savetxt(os.path.join(directory,'delta12_dagger.txt'), H_trainable[13].numpy())
         np.savetxt(os.path.join(directory,'delta1_min2_dagger.txt'), H_trainable[14].numpy())
 
+        if(self.do_threshold) == True:
+            #Adding section for zeroing out small weights
+            for i in range(len(H_trainable)):
+                condition = tf.abs(tf.math.real(H_trainable[i])) < self.threshold_val
+                rounded_mat = tf.where(condition, tf.zeros_like(H_trainable[i]), H_trainable[i])
+                H_trainable[i] = rounded_mat
+
         #For plotting
         self.H_final = [H_trainable[0].numpy(), H_trainable[1].numpy(), H_trainable[2].numpy(), H_trainable[9].numpy(), H_trainable[3].numpy(), H_trainable[10].numpy(), H_trainable[4].numpy(), H_trainable[11].numpy()]
         
@@ -331,6 +341,15 @@ class TBNN_V2_DoubleGamma:
         new_valence_band = extracted_bands[:,v]
         print("Ec = " , np.min(new_conduction_band) , "Ev = " , np.max(new_valence_band))
 
+    def create_weight_mat(self,c,v):
+        num_cb = self.target_bands - c
+        num_vb = self.target_bands - num_cb
+        cb_weights = np.array([3, 1, 1, 0, 0, 0, 0, 0, 0])
+        vb_weights = np.array([0,0,0,0,0,0,0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 3])
+        band_weights = np.concatenate((vb_weights, cb_weights))
+        print(band_weights)
+        return tf.convert_to_tensor(band_weights, dtype=tf.float32)
+
 
     def fit_bands(self):
         """ 
@@ -343,7 +362,7 @@ class TBNN_V2_DoubleGamma:
             
 
         #abinit_bands and kpoints are already tensor objects
-        nband, nks, truncated_bands, kpoints = self._Extract_Abinit_Eigvals(self.bands_filename)
+        nband, nks, truncated_bands, kpoints, c, v = self._Extract_Abinit_Eigvals(self.bands_filename)
         
         #initialize Hamiltonian
         if(self.restart):
@@ -359,18 +378,27 @@ class TBNN_V2_DoubleGamma:
         loss_list = []
         count = 0
 
+        band_weights = self.create_weight_mat(c,v)
         while(loss > self.converge_target and count < self.max_iter):
             
             with tf.GradientTape() as tape:
                 
                 E_tb_pred = self.Calculate_Energy_Eigenvals(H_trainable, kpoints, nks)
 
-                loss1 = tf.reduce_mean(tf.square(E_tb_pred - truncated_bands))
+                diff_tens = tf.square(E_tb_pred - truncated_bands)
+                diff_tens = diff_tens * band_weights
+
+                loss1 = tf.reduce_mean(diff_tens)
                 
                 loss_reg = 0
-                for i in range(len(H_trainable)):
+                loss_reg_extended = 0
+                for i in range(9):
                     loss_reg += tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[i])))), dtype=tf.float32)
-                loss = loss1 + self.regularization_factor*loss_reg
+                for i in range(9,15):
+                    loss_reg_extended += tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[i])))), dtype=tf.float32)
+
+                loss = loss1 + self.regularization_factor*loss_reg + self.regularization_factor_ext*loss_reg_extended
+
                 print('Iteration: ', count,' Loss: ' , (loss).numpy())
 
             grad = tape.gradient(loss, H_trainable)

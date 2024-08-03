@@ -68,7 +68,7 @@ class TBNN_V2:
         first_eigval_set = truncated_bands[1,:]
         pos_eigvals = [a for a in first_eigval_set if a> 0]
         neg_eigvals = [a for a in first_eigval_set if a < 0]
-
+    
         pos_smallest = min(pos_eigvals, key=abs)
         neg_smallest = min(neg_eigvals, key=abs)
         c = int(np.where(first_eigval_set == pos_smallest)[0])

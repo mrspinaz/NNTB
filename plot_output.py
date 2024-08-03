@@ -3,6 +3,7 @@ import re
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
+from itertools import product
 
 def Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b):
 
@@ -47,7 +48,7 @@ def Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b):
 
         conduction_band = truncated_bands[:,c]
         valence_band = truncated_bands[:,v]
-
+        print(c,v)
         bandgap = np.min(conduction_band) - np.max(valence_band)
         
 
@@ -109,66 +110,9 @@ def Load_H_From_Save(H_filename):
 
 def Plot_CB_Surf(bands_filename, skip_bands, target_bands, Ef, a, b):
     nband, nks, truncated_bands, kpoints = Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b)
-    kx = kpoints[0,:]
-    ky = kpoints[1,:]
-    print(ky/(np.pi/b))
-    nks = len(kpoints[0,:])
-
-    kx_plot = kx.reshape(int(np.sqrt(nks)),int(np.sqrt(nks)))*(a/(2*np.pi))
-    ky_plot = ky.reshape(31,31)*(b/(2*np.pi))
-    #Z2 = truncated_bands[:,12].reshape(len(kx),len(ky))
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    print("Valence: ", truncated_bands[(np.abs(truncated_bands[:,5] - Ef)).argmin(),5])
-    print("Conduction: ", truncated_bands[(np.abs(truncated_bands[:,6] - Ef)).argmin(),6])
-
-
-    ax.plot_surface(kx_plot,ky_plot,truncated_bands[:,5].reshape(len(kx_plot),len(ky_plot)), cmap=cm.viridis)
-    #ax.plot_surface(kx_plot,ky_plot,truncated_bands[:,6].reshape(len(kx_plot),len(ky_plot)), color='blue')
-    plt.show()
-
-    '''
-    hamiltonian = Load_Hamiltonian()
-    alpha = hamiltonian[0]
-    beta = hamiltonian[1]
-    gamma = hamiltonian[2]
-    delta11 = hamiltonian[3]
-    delta1_min1 = hamiltonian[4]
-
-    beta_dagger = hamiltonian[5]
-    gamma_dagger = hamiltonian[6]
-    delta11_dagger = hamiltonian[7]
-    delta1_min1_dagger = hamiltonian[8]
-
-    E = np.zeros((target_bands,len(kx)))
-    for ii in range(len(kx)):
-        H = alpha + beta*np.exp(1j*kx[ii]*a) + gamma*np.exp(1j*ky[ii]*b) + \
-            delta11*np.exp(1j*kx[ii]*a + 1j*ky[ii]*b) + delta1_min1*np.exp(1j*kx[ii]*a - 1j*ky[ii]*b) + \
-            beta_dagger*np.exp(-1j*kx[ii]*a) + gamma_dagger*np.exp(-1j*ky[ii]*b) + \
-            delta11_dagger*np.exp(-1j*kx[ii]*a - 1j*ky[ii]*b) + delta1_min1_dagger*np.exp(-1j*kx[ii]*a + 1j*ky[ii]*b)
-        eigvals, eigvecs = np.linalg.eig(H)
-
-        E[:,ii] = np.sort((eigvals.T))
     
-    E = E.T
-    ax.scatter(kx_plot,ky_plot,E[:,11].reshape(len(kx_plot),len(ky_plot)), s=2, color='red')
-    ax.scatter(kx_plot,ky_plot,E[:,12].reshape(len(kx_plot),len(ky_plot)), s=2, color='red')
-
-
-
-    #ax.plot_surface(kx,ky,Z2,cmap=cm.coolwarm)
-    ax.set_xlabel('kx')
-    ax.set_ylabel('ky')
-    ax.set_zlabel('E [eV]')
-    plt.show()
-'''
-
-def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
-
-    nband, nks, truncated_bands, kpoints = Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b)
-
     adjust_bandgap = True
-    experimental_bandgap = 0.74 #0.74 for 3L_Te
+    experimental_bandgap = 2.07 #0.74 for 3L_Te
     if(adjust_bandgap):
         first_eigval_set = truncated_bands[1,:]
         pos_eigvals = [a for a in first_eigval_set if a> 0]
@@ -186,8 +130,108 @@ def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
         print("Ec = " , np.min(conduction_band) , "Ev = " , np.max(valence_band))
         bandgap_shift = experimental_bandgap - bandgap
         
-        truncated_bands[:,c:] += bandgap_shift/2
-        truncated_bands[:,0:v+1] -= bandgap_shift/2 + 0.1
+        truncated_bands[:,c:] += bandgap_shift/2 
+        truncated_bands[:,0:v+1] -= bandgap_shift/2 
+    
+    
+    kx = kpoints[0,:]
+    ky = kpoints[1,:]
+    
+    nks = len(kpoints[0,:])
+
+    kx_plot = kx.reshape(int(np.sqrt(nks)),int(np.sqrt(nks)))*(a/(2*np.pi))
+    ky_plot = ky.reshape(int(np.sqrt(nks)),int(np.sqrt(nks)))*(b/(2*np.pi))
+    #Z2 = truncated_bands[:,12].reshape(len(kx),len(ky))
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    print("Valence: ", truncated_bands[(np.abs(truncated_bands[:,13] - Ef)).argmin(),13])
+    print("Conduction: ", truncated_bands[(np.abs(truncated_bands[:,14] - Ef)).argmin(),14])
+
+    ax.plot_surface(kx_plot,ky_plot,truncated_bands[:,12].reshape(len(kx_plot),len(ky_plot)), cmap=cm.viridis)
+    ax.plot_surface(kx_plot,ky_plot,truncated_bands[:,13].reshape(len(kx_plot),len(ky_plot)), cmap=cm.viridis)
+    #ax.plot_surface(kx_plot,ky_plot,truncated_bands[:,14].reshape(len(kx_plot),len(ky_plot)), color='blue')
+    
+
+
+    hamiltonian = Load_Hamiltonian()
+    alpha = hamiltonian[0]
+    beta = hamiltonian[1]
+    gamma = hamiltonian[2]
+    delta11 = hamiltonian[3]
+    delta1_min1 = hamiltonian[4]
+
+    beta_dagger = hamiltonian[5]
+    gamma_dagger = hamiltonian[6]
+    delta11_dagger = hamiltonian[7]
+    delta1_min1_dagger = hamiltonian[8]
+
+    kx_new = np.linspace(0,1*np.pi/a,21)
+    ky_new = np.linspace(0,1*np.pi/b,21)
+
+    kx_2D, ky_2D = np.meshgrid(kx_new,ky_new)
+    kx = np.reshape(kx_2D, np.size(kx_2D),order='C')
+    ky = np.reshape(ky_2D, np.size(ky_2D),order='C')
+
+
+    E = np.zeros((target_bands,len(kx)))
+    for ii in range(len(kx)):
+        H = alpha + beta*np.exp(1j*kx[ii]*a) + gamma*np.exp(1j*ky[ii]*b) + \
+            delta11*np.exp(1j*kx[ii]*a + 1j*ky[ii]*b) + delta1_min1*np.exp(1j*kx[ii]*a - 1j*ky[ii]*b) + \
+            beta_dagger*np.exp(-1j*kx[ii]*a) + gamma_dagger*np.exp(-1j*ky[ii]*b) + \
+            delta11_dagger*np.exp(-1j*kx[ii]*a - 1j*ky[ii]*b) + delta1_min1_dagger*np.exp(-1j*kx[ii]*a + 1j*ky[ii]*b)
+        eigvals, eigvecs = np.linalg.eig(H)
+
+        E[:,ii] = np.sort((eigvals.T))
+    
+    E = E.T
+
+
+    kx_2D = kx_2D*(a/(2*np.pi))
+    ky_2D = ky_2D*(b/(2*np.pi))
+
+    #ax.scatter(kx_2D,ky_2D,E[:,12].reshape(len(kx_plot),len(ky_plot)), s=5, color='red')
+    #ax.scatter(kx_2D,ky_2D,E[:,13].reshape(len(kx_plot),len(ky_plot)), s=5, color='red')
+    #ax.scatter(kx_2D,ky_2D,E[:,14].reshape(len(kx_plot),len(ky_plot)), s=3, color='red')
+    
+
+    #ax.plot_surface(kx_2D,ky_2D,E[:,12].reshape(len(kx_plot),len(ky_plot)), color='red')
+    #ax.plot_surface(kx_2D,ky_2D,E[:,13].reshape(len(kx_plot),len(ky_plot)), color='red')
+    #ax.plot_surface(kx_plot,ky_plot,E[:,14].reshape(len(kx_plot),len(ky_plot)), color='red')
+
+
+
+    #ax.plot_surface(kx,ky,Z2,cmap=cm.coolwarm)
+    ax.set_xlabel('kx')
+    ax.set_ylabel('ky')
+    ax.set_zlabel('E [eV]')
+    plt.show()
+
+
+def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
+
+    nband, nks, truncated_bands, kpoints = Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b)
+
+    adjust_bandgap = True
+    experimental_bandgap = 2.07 #0.74 for 3L_Te
+    if(adjust_bandgap):
+        first_eigval_set = truncated_bands[1,:]
+        pos_eigvals = [a for a in first_eigval_set if a> 0]
+        neg_eigvals = [a for a in first_eigval_set if a < 0]
+
+        pos_smallest = min(pos_eigvals, key=abs)
+        neg_smallest = min(neg_eigvals, key=abs)
+        c = int(np.where(first_eigval_set == pos_smallest)[0])
+        v = int(np.where(first_eigval_set == neg_smallest)[0])
+
+        conduction_band = truncated_bands[:,c]
+        valence_band = truncated_bands[:,v]
+
+        bandgap = np.min(conduction_band) - np.max(valence_band)
+        print("Ec = " , np.min(conduction_band) , "Ev = " , np.max(valence_band))
+        bandgap_shift = experimental_bandgap - bandgap
+        
+        truncated_bands[:,c:] += bandgap_shift/2 
+        truncated_bands[:,0:v+1] -= bandgap_shift/2 
 
         #For testing
         new_conduction_band = truncated_bands[:,c]
@@ -196,6 +240,7 @@ def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
     
     kx = kpoints[0,:]
     ky = kpoints[1,:]
+    print(len(ky))
 
     hamiltonian = Load_H_From_Save(H_filename)
     alpha = hamiltonian[0]
@@ -218,6 +263,7 @@ def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
         eigvals, eigvecs = np.linalg.eig(H)
 
         E[:,ii] = np.sort((eigvals.T))
+       
 
     plt.figure()
     x_vals = np.linspace(0,1,len(kx))
@@ -275,13 +321,19 @@ def Plot_Hamiltonian(H_filename):
 
 #old fermi was -2.5834
 plt.close("all")
+
+
+a = 2.91206186883E-10
+b = 5.04382216226E-10
+
 #Plot_CB_Surf('HfS2_31x31_bands.dat',12,18, -2.5834 , 6.290339483e-10, 3.631729507E-10)
 #Plot_Bands('HfS2_GXSYG_bands.dat',12,18, -2.5834, 6.290339483e-10, 3.631729507E-10)
-Plot_Bands('3L_Te_GXSYG_bands.dat','3L_Te_SingleGamma_FullIBZFit_L1.5e-5_weighed_21x21_18bands.dat',18,18,-0.5292, 5.84536306E-10, 4.36037009E-10)
-#Plot_CB_Surf('2L_Te_31x31_bands.dat',12,12, -1.9463, 5.7885636E-10, 4.3185190E-10)
-Plot_Hamiltonian('3L_Te_SingleGamma_FullIBZFit_L1.5e-5_weighed_21x21_18bands.dat')
+#Plot_Bands('WSi2N4_Supercell_GXSYG_bands.dat','WSi2N4_H_1.dat',28,24,1.3267 + 1, a, b)
+Plot_CB_Surf('WSi2N4_Supercell_25x25_bands.dat',28,24, 1.3267, a, b)
+#Plot_Hamiltonian('WSi2N4_H_1.dat')
 
-#El vals
+
+#3L vals
 a = 5.84536306E-10
 b = 4.36037009E-10
 Ef = -0.5292

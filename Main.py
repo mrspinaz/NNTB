@@ -1,10 +1,10 @@
 import numpy as np
 import tensorflow as tf
-from TBNN_Model_V2 import TBNN_V2
-from TBNN_Model_V2_extended import TBNN_V2_DoubleGamma
-from TBNN_Model_V2_weighted import TBNN_V2_weighted
-from TBNN_Model_V2_fitwan import TBNN_V2_fitwan
-from TBNN_Model_V2_fitwan_extended import TBNN_V2_fitwan_extended
+from NN_Models.TBNN_Model_V2 import TBNN_V2
+from NN_Models.TBNN_Model_V2_extended import TBNN_V2_DoubleGamma
+from NN_Models.TBNN_Model_V2_weighted import TBNN_V2_weighted
+from NN_Models.TBNN_Model_V2_fitwan import TBNN_V2_fitwan
+from NN_Models.TBNN_Model_V2_fitwan_extended import TBNN_V2_fitwan_extended
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 '''

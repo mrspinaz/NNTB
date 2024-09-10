@@ -71,7 +71,7 @@ def Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b):
         kpoints[0,:] =  abs((kpoints[0,:])*(2.0*np.pi/a))
         kpoints[1,:] =  abs((kpoints[1,:]/ky_factor)*(2.0*np.pi/b) ) 
 
-        return nband, nks, truncated_bands, kpoints
+        return nband, nks, truncated_bands, kpoints,c,v
 
 def Load_Hamiltonian():
     alpha = np.real(np.loadtxt('H_output/alpha.txt', dtype=complex))
@@ -108,8 +108,8 @@ def Load_H_From_Save(H_filename):
 
     return Hamiltonian
 
-def Plot_CB_Surf(bands_filename, skip_bands, target_bands, Ef, a, b):
-    nband, nks, truncated_bands, kpoints = Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b)
+def Plot_CB_Surf(bands_filename,H_filename, skip_bands, target_bands, Ef, a, b):
+    nband, nks, truncated_bands, kpoints,c, v = Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b)
     
     adjust_bandgap = True
     experimental_bandgap = 2.07 #0.74 for 3L_Te
@@ -147,13 +147,13 @@ def Plot_CB_Surf(bands_filename, skip_bands, target_bands, Ef, a, b):
     print("Valence: ", truncated_bands[(np.abs(truncated_bands[:,13] - Ef)).argmin(),13])
     print("Conduction: ", truncated_bands[(np.abs(truncated_bands[:,14] - Ef)).argmin(),14])
 
-    ax.plot_surface(kx_plot,ky_plot,truncated_bands[:,12].reshape(len(kx_plot),len(ky_plot)), cmap=cm.viridis)
-    ax.plot_surface(kx_plot,ky_plot,truncated_bands[:,13].reshape(len(kx_plot),len(ky_plot)), cmap=cm.viridis)
+    #ax.plot_surface(kx_plot,ky_plot,truncated_bands[:,c].reshape(len(kx_plot),len(ky_plot)), cmap=cm.viridis)
+    #ax.plot_surface(kx_plot,ky_plot,truncated_bands[:,v].reshape(len(kx_plot),len(ky_plot)), cmap=cm.viridis)
     #ax.plot_surface(kx_plot,ky_plot,truncated_bands[:,14].reshape(len(kx_plot),len(ky_plot)), color='blue')
     
 
 
-    hamiltonian = Load_Hamiltonian()
+    hamiltonian = Load_H_From_Save(H_filename)
     alpha = hamiltonian[0]
     beta = hamiltonian[1]
     gamma = hamiltonian[2]
@@ -165,8 +165,8 @@ def Plot_CB_Surf(bands_filename, skip_bands, target_bands, Ef, a, b):
     delta11_dagger = hamiltonian[7]
     delta1_min1_dagger = hamiltonian[8]
 
-    kx_new = np.linspace(0,1*np.pi/a,21)
-    ky_new = np.linspace(0,1*np.pi/b,21)
+    kx_new = np.linspace(-1*np.pi/a,1*np.pi/a,31)
+    ky_new = np.linspace(-1*np.pi/b,1*np.pi/b,31)
 
     kx_2D, ky_2D = np.meshgrid(kx_new,ky_new)
     kx = np.reshape(kx_2D, np.size(kx_2D),order='C')
@@ -189,13 +189,13 @@ def Plot_CB_Surf(bands_filename, skip_bands, target_bands, Ef, a, b):
     kx_2D = kx_2D*(a/(2*np.pi))
     ky_2D = ky_2D*(b/(2*np.pi))
 
-    #ax.scatter(kx_2D,ky_2D,E[:,12].reshape(len(kx_plot),len(ky_plot)), s=5, color='red')
-    #ax.scatter(kx_2D,ky_2D,E[:,13].reshape(len(kx_plot),len(ky_plot)), s=5, color='red')
+    #ax.scatter(kx_2D,ky_2D,E[:,c].reshape(len(kx_plot),len(ky_plot)), s=5, color='red')
+    #ax.scatter(kx_2D,ky_2D,E[:,v].reshape(len(kx_plot),len(ky_plot)), s=5, color='red')
     #ax.scatter(kx_2D,ky_2D,E[:,14].reshape(len(kx_plot),len(ky_plot)), s=3, color='red')
     
 
-    #ax.plot_surface(kx_2D,ky_2D,E[:,12].reshape(len(kx_plot),len(ky_plot)), color='red')
-    #ax.plot_surface(kx_2D,ky_2D,E[:,13].reshape(len(kx_plot),len(ky_plot)), color='red')
+    #ax.plot_surface(kx_2D,ky_2D,E[:,c].reshape(len(kx_plot),len(ky_plot)), cmap=cm.viridis)
+    ax.plot_surface(kx_2D,ky_2D,E[:,v].reshape(31,31), cmap=cm.viridis)
     #ax.plot_surface(kx_plot,ky_plot,E[:,14].reshape(len(kx_plot),len(ky_plot)), color='red')
 
 
@@ -209,10 +209,10 @@ def Plot_CB_Surf(bands_filename, skip_bands, target_bands, Ef, a, b):
 
 def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
 
-    nband, nks, truncated_bands, kpoints = Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b)
+    nband, nks, truncated_bands, kpoints,c,v = Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b)
 
     adjust_bandgap = True
-    experimental_bandgap = 2.07 #0.74 for 3L_Te
+    experimental_bandgap = 1.89638 #0.74 for 3L_Te
     if(adjust_bandgap):
         first_eigval_set = truncated_bands[1,:]
         pos_eigvals = [a for a in first_eigval_set if a> 0]
@@ -262,8 +262,13 @@ def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
             delta11_dagger*np.exp(-1j*kx[ii]*a - 1j*ky[ii]*b) + delta1_min1_dagger*np.exp(-1j*kx[ii]*a + 1j*ky[ii]*b)
         eigvals, eigvecs = np.linalg.eig(H)
 
-        E[:,ii] = np.sort((eigvals.T))
-       
+        E[:,ii] = np.real(np.sort((eigvals.T)))
+    
+    DeltaEc = min(E[c,:])
+    DeltaEv = -1*max(E[v,:])
+    print("Ec - Ef = ", DeltaEc, " eV")
+    print("Ef - Ev = ", DeltaEv, " eV")
+    print("Eg = ", DeltaEc + DeltaEv, " eV")
 
     plt.figure()
     x_vals = np.linspace(0,1,len(kx))
@@ -275,7 +280,9 @@ def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
 
 def Plot_Hamiltonian(H_filename):
     hamiltonian = Load_H_From_Save(H_filename)
-
+    dims = np.shape(hamiltonian)
+    for i in range(dims[0]):
+        hamiltonian[i] = np.real(hamiltonian[i])
 
     num_bands = hamiltonian[0].shape[1]
 
@@ -323,14 +330,19 @@ def Plot_Hamiltonian(H_filename):
 plt.close("all")
 
 
-a = 2.91206186883E-10
-b = 5.04382216226E-10
+a = 6.290339029863558E-10
+b = 3.631729244941925E-10
+Ef = -3.3312
+target_bands = 22
+skip_bands = 12
+H_filename = 'HfS2_DFTfit_noreg.dat'
+DFT_filename = 'HfS2_bands.dat'
 
 #Plot_CB_Surf('HfS2_31x31_bands.dat',12,18, -2.5834 , 6.290339483e-10, 3.631729507E-10)
 #Plot_Bands('HfS2_GXSYG_bands.dat',12,18, -2.5834, 6.290339483e-10, 3.631729507E-10)
-#Plot_Bands('WSi2N4_Supercell_GXSYG_bands.dat','WSi2N4_H_1.dat',28,24,1.3267 + 1, a, b)
-Plot_CB_Surf('WSi2N4_Supercell_25x25_bands.dat',28,24, 1.3267, a, b)
-#Plot_Hamiltonian('WSi2N4_H_1.dat')
+Plot_Bands(DFT_filename,H_filename,skip_bands,target_bands,Ef, a, b)
+#Plot_CB_Surf(DFT_filename,H_filename,30,24, 1.3267, a, b)
+Plot_Hamiltonian(H_filename)
 
 
 #3L vals

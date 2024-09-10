@@ -182,8 +182,8 @@ def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
 
     nband, nks, truncated_bands, kpoints = Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b)
 
-    adjust_bandgap = True
-    experimental_bandgap = 0.85
+    adjust_bandgap = False
+    experimental_bandgap = 1.5419
     if(adjust_bandgap):
         first_eigval_set = truncated_bands[1,:]
         pos_eigvals = [a for a in first_eigval_set if a> 0]
@@ -323,11 +323,12 @@ def Plot_Hamiltonian(H_filename):
 
 
 
-
+a = 12.0960905342*0.529177211e-10
+b = 6.98368844626*0.529177211e-10
 #old fermi was -2.5834
 plt.close("all")
 #Plot_CB_Surf('HfS2_31x31_bands.dat',12,18, -2.5834 , 6.290339483e-10, 3.631729507E-10)
 #Plot_Bands('HfS2_GXSYG_bands.dat',12,18, -2.5834, 6.290339483e-10, 3.631729507E-10)
-Plot_Bands('3L_Te_GXSYG_bands.dat','3L_Te_DoubleGamma_FullIBZFit_L1e-5_weighted_21x21_27bands_14.dat',9,27,-0.5292, 5.84536306E-10, 4.36037009E-10)
+Plot_Bands('HfS2_bands.dat','ML_HfS2_1L.dat',12,18,-3.3312, a, b)
 #Plot_CB_Surf('2L_Te_31x31_bands.dat',12,12, -1.9463, 5.7885636E-10, 4.3185190E-10)
-Plot_Hamiltonian('3L_Te_DoubleGamma_FullIBZFit_L1e-5_weighted_21x21_27bands_14.dat')
+#Plot_Hamiltonian('3L_Te_DoubleGamma_FullIBZFit_L1e-5_weighted_21x21_27bands_14.dat')

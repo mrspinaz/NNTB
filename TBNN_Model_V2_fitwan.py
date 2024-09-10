@@ -3,18 +3,16 @@ import os
 import numpy as np
 import tensorflow as tf
 
-class TBNN_V2_weighted:
+class TBNN_V2_fitwan:
     #Maybe change code at some point to extract these from scf, bands, etc output files, other than boolean commands.
-    def __init__(self, a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor ,bands_filename, output_hamiltonian_name, adjust_bandgap, experimental_bandgap,L2_factor,do_threshold,threshold_val, fit_MLWF):
+    def __init__(self, a, b, restart, target_bands, converge_target, max_iter, learn_rate, regularization_factor ,bands_filename, output_hamiltonian_name):
         self.a = a
         self.b = b
         self.a_tens = tf.convert_to_tensor(a,dtype=tf.complex64)
         self.b_tens = tf.convert_to_tensor(b,dtype=tf.complex64)
 
 
-        self.Ef = Ef
         self.restart = restart
-        self.skip_bands = skip_bands
         self.target_bands = target_bands
         self.converge_target = converge_target
         self.max_iter = max_iter
@@ -23,54 +21,51 @@ class TBNN_V2_weighted:
         self.bands_filename = bands_filename
         self.output_hamiltonian_name = output_hamiltonian_name
 
-        self.adjust_bandgap = adjust_bandgap
-        self.experimental_bandgap = experimental_bandgap
-        self.L2_factor = L2_factor
-        self.fit_MLWF = fit_MLWF
+    def _Extract_Wannier_Eigvals(self,a,b, bands_filename):
 
-        self.do_threshold = do_threshold
-        self.threshold_val = threshold_val
+        
+        ham = np.loadtxt('inputs/' + bands_filename, dtype=float)
+        dims = np.shape(ham)
+        sqdim = int(np.sqrt(dims[0]))
+        alpha = ham[:,0].reshape(sqdim,sqdim)
+        beta = ham[:,1].reshape(sqdim,sqdim)
+        gamma = ham[:,2].reshape(sqdim,sqdim)
+        gamma2 = ham[:,3].reshape(sqdim,sqdim)
+        delta11 = ham[:,4].reshape(sqdim,sqdim)
+        delta12 = ham[:,5].reshape(sqdim,sqdim)
+        delta1_min1 = ham[:,6].reshape(sqdim,sqdim)
+        delta1_min2 = ham[:,7].reshape(sqdim,sqdim)
 
-    def _Extract_Abinit_Eigvals(self, bands_filename):
+        beta_dagger = np.transpose(beta)
+        gamma_dagger = np.transpose(gamma)
+        gamma2_dagger = np.transpose(gamma2)
+        delta11_dagger = np.transpose(delta11)
+        delta12_dagger = np.transpose(delta12)
+        delta1_min1_dagger = np.transpose(delta1_min1)
+        delta1_min2_dagger = np.transpose(delta1_min2)
 
-        file_dir = 'inputs/' + bands_filename
+        kgrid_size = 21
+        kx_new = np.linspace(0,np.pi/self.a,kgrid_size)
+        ky_new = np.linspace(0,np.pi/self.b,kgrid_size)
 
-        with open(file_dir) as file:
-            first_line = file.readline().strip()
-           
-            temp = re.findall('\d+',first_line)
-            nband = int(temp[0])
-            nks = int(temp[1])
-            kpoints = np.zeros((2,nks))
-            abinit_bands = np.zeros(nband*nks)
+        kx_2D, ky_2D = np.meshgrid(kx_new,ky_new)
+        nks = np.size(kx_2D)
+        kx = np.reshape(kx_2D, (1,np.size(kx_2D)),order='F').flatten()
+        ky = np.reshape(ky_2D, (1,np.size(ky_2D)),order='F').flatten()
+        kpoints = np.vstack((kx,ky))
 
-            k_count = 0
-            start = 0
-            for line in file:
-                line_split = line.split()
-                line_split = [float(x) for x in line_split]
-                if( len(line_split) == 3 and line_split[2] == 0.0 ):
-                    kpoints[:,k_count] = line_split[0], line_split[1]
-                    k_count += 1
-                    
-                else:
-                    #reading energy eigenvals
-                    abinit_bands[start:start + len(line_split)] = line_split
-                    start += len(line_split)
+        bands = np.zeros((nks,sqdim))
+        for ii in range(len(kx)):
+            H = alpha + beta*np.exp(1j*kx[ii]*a) + gamma*np.exp(1j*ky[ii]*b) + gamma2*np.exp(2j*ky[ii]*b) + \
+            delta11*np.exp(1j*kx[ii]*a + 1j*ky[ii]*b) + delta12*np.exp(1j*kx[ii]*a + 2j*ky[ii]*b)  + \
+            delta1_min1*np.exp(1j*kx[ii]*a - 1j*ky[ii]*b) + delta1_min2*np.exp(1j*kx[ii]*a - 2j*ky[ii]*b) + \
+            beta_dagger*np.exp(-1j*kx[ii]*a) + gamma_dagger*np.exp(-1j*ky[ii]*b) + gamma2_dagger*np.exp(-2j*ky[ii]*b) + \
+            delta11_dagger*np.exp(-1j*kx[ii]*a - 1j*ky[ii]*b) + delta12_dagger*np.exp(-1j*kx[ii]*a - 2j*ky[ii]*b) + \
+            delta1_min1_dagger*np.exp(-1j*kx[ii]*a + 1j*ky[ii]*b) + delta1_min2_dagger*np.exp(-1j*kx[ii]*a + 2j*ky[ii]*b)
+            eigvals, eigvecs = np.linalg.eig(H)
+            bands[ii,:] = np.sort((eigvals))
 
-            abinit_bands = abinit_bands - self.Ef
-            abinit_bands = abinit_bands.reshape(nks,nband)
-            truncated_bands = abinit_bands[:, self.skip_bands:(self.skip_bands + self.target_bands)]        
-            
-
-        file.close()
-
-        #Convert k_points to their actual values
-        ky_factor = self.a/self.b
-        kpoints[0,:] =  np.abs((kpoints[0,:])*(2.0*np.pi/self.a))
-        kpoints[1,:] =  np.abs((kpoints[1,:]/ky_factor)*(2.0*np.pi/self.b))
-
-        first_eigval_set = truncated_bands[1,:]
+        first_eigval_set = bands[1,:]
         pos_eigvals = [a for a in first_eigval_set if a> 0]
         neg_eigvals = [a for a in first_eigval_set if a < 0]
 
@@ -79,47 +74,27 @@ class TBNN_V2_weighted:
         c = int(np.where(first_eigval_set == pos_smallest)[0])
         v = int(np.where(first_eigval_set == neg_smallest)[0])
 
-        conduction_band = truncated_bands[:,c]
-        valence_band = truncated_bands[:,v]
+        conduction_band = bands[:,c]
+        valence_band = bands[:,v]
 
         bandgap = np.min(conduction_band) - np.max(valence_band)
-        
 
-        #Additional energy shift applied to position Ef at midgap
-        cb_shift = abs(abs(np.min(conduction_band)) - bandgap/2.0)
-        vb_shift = abs(abs(np.max(valence_band)) - bandgap/2.0)
-        print(cb_shift, " ", vb_shift)
-        if( abs(np.min(conduction_band)) < abs(np.max(valence_band))):
-            truncated_bands[:,c:] += cb_shift
-            truncated_bands[:,0:v+1] += vb_shift
-        else:
-            truncated_bands[:,c:] -= cb_shift
-            truncated_bands[:,0:v+1] -= vb_shift
-
-
+        #add dummy bands as needed, default to 10 eV as dummy value.
+        extra_bands = self.target_bands - len(first_eigval_set)
+        dummy_bands = 10*np.ones((len(conduction_band),extra_bands))
+        bands = np.concatenate((bands,dummy_bands),axis=1)
         #Ec and Ev should have the same magnitude
-        print("Ec = " , np.min(truncated_bands[:,c])  , "Ev = " , np.max(truncated_bands[:,v]))
+        print("Ec = " , np.min(bands[:,c])  , "Ev = " , np.max(bands[:,v]))
         
-        if(self.adjust_bandgap):
-
-            bandgap_shift = self.experimental_bandgap - bandgap
-            
-            truncated_bands[:,c:] += bandgap_shift/2
-            truncated_bands[:,0:v+1] -= bandgap_shift/2
-
-            
-            #For testing
-            #new_conduction_band = truncated_bands[:,c]
-            #new_valence_band = truncated_bands[:,v]
-            #print("Ec = " , np.min(new_conduction_band) , "Ev = " , np.max(new_valence_band))
-
         
         kpoints = tf.convert_to_tensor(kpoints, dtype =tf.complex64)
-        truncated_bands = tf.convert_to_tensor(truncated_bands, dtype =tf.float32)
-        print("Ec = " , np.min(truncated_bands[:,c])  , "Ev = " , np.max(truncated_bands[:,v]))
-        
-        return nband, nks, truncated_bands, kpoints , c, v
+        bands = tf.convert_to_tensor(bands, dtype =tf.float32)
+
+        #To expand the fitting basis, add dummy eigvals to bands here, then you can just expand mat dims in Initialize_Hamiltonian.
+
+        return nks, bands, kpoints , c, v
     
+
     def _Initialize_Hamiltonian(self):
 
 
@@ -279,12 +254,6 @@ class TBNN_V2_weighted:
         np.savetxt(os.path.join(directory,'delta11_dagger.txt'), H_trainable[7].numpy())
         np.savetxt(os.path.join(directory,'delta1_min1_dagger.txt'), H_trainable[8].numpy())
 
-        if(self.do_threshold) == True:
-            #Adding section for zeroing out small weights
-            for i in range(len(H_trainable)):
-                condition = tf.abs(tf.math.real(H_trainable[i])) < self.threshold_val
-                rounded_mat = tf.where(condition, tf.zeros_like(H_trainable[i]), H_trainable[i])
-                H_trainable[i] = rounded_mat
 
         #For plotting
         self.H_final = [H_trainable[0].numpy(), H_trainable[1].numpy(), H_trainable[2].numpy(), H_trainable[3].numpy(), H_trainable[4].numpy(), H_trainable[5].numpy(), H_trainable[6].numpy(), H_trainable[7].numpy(), H_trainable[8].numpy()]
@@ -299,37 +268,11 @@ class TBNN_V2_weighted:
             H_save[:,i] = flat_mat
         np.savetxt(os.path.join(directory, self.output_hamiltonian_name), H_save, delimiter='\t')
     
-    def adjust_bandgap(self, extracted_bands):
-
-        first_eigval_set = extracted_bands[1,:]
-        pos_eigvals = [a for a in first_eigval_set if a> 0]
-        neg_eigvals = [a for a in first_eigval_set if a < 0]
-
-        pos_smallest = min(pos_eigvals, key=abs)
-        neg_smallest = min(neg_eigvals, key=abs)
-        c = int(np.where(first_eigval_set == pos_smallest)[0])
-        v = int(np.where(first_eigval_set == neg_smallest)[0])
-
-        conduction_band = extracted_bands[:,c]
-        valence_band = extracted_bands[:,v]
-
-        bandgap = np.min(conduction_band) - np.max(valence_band)
-        print("Ec = " , np.min(conduction_band) , "Ev = " , np.max(valence_band))
-        bandgap_shift = self.experimental_bandgap - bandgap
-        
-        extracted_bands[:,c:] += bandgap_shift/2
-        extracted_bands[:,0:v+1] -= bandgap_shift/2
-
-        #For testing
-        new_conduction_band = extracted_bands[:,c]
-        new_valence_band = extracted_bands[:,v]
-        print("Ec = " , np.min(new_conduction_band) , "Ev = " , np.max(new_valence_band))
-    
     def create_weight_mat(self,c,v):
         num_cb = self.target_bands - c
         num_vb = self.target_bands - num_cb
-        cb_weights = np.array([1,1,1,1,1,1,0,0,0,0])
-        vb_weights = np.array([0,0,0,0,0,0,1,1,1,1,1,1])
+        cb_weights = np.array([2,2,2,1,1,1,0.0005,0.0000,0.0000,0.000,0,0,0,0])
+        vb_weights = np.array([0.0000,0.0000,0.0000,0.0000,0,0,1,1,1,2,2,2])
         band_weights = np.concatenate((vb_weights, cb_weights))
         print(band_weights)
         return tf.convert_to_tensor(band_weights, dtype=tf.float32)
@@ -346,13 +289,11 @@ class TBNN_V2_weighted:
             
 
         #abinit_bands and kpoints are already tensor objects
-        nband, nks, truncated_bands, kpoints, c, v = self._Extract_Abinit_Eigvals(self.bands_filename)
+        nks, wan_bands, kpoints, c, v = self._Extract_Wannier_Eigvals(self.a, self.b, self.bands_filename)
         
         #initialize Hamiltonian
         if(self.restart):
             H_trainable = self._Reinitialize()
-        elif(self.fit_MLWF):
-            H_trainable = self._Initialize_MLWF()
         else:
             H_trainable = self._Initialize_Hamiltonian()
         
@@ -372,7 +313,7 @@ class TBNN_V2_weighted:
                 
                 E_tb_pred = self.Calculate_Energy_Eigenvals(H_trainable, kpoints, nks)
                 
-                diff_tens = tf.square(E_tb_pred - truncated_bands)
+                diff_tens = tf.square(E_tb_pred - wan_bands)
                 diff_tens = diff_tens * band_weights
 
                 loss1 = tf.reduce_mean(diff_tens)
@@ -382,6 +323,14 @@ class TBNN_V2_weighted:
 
                 for i in L1_mats:
                     loss_reg += tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[i])))), dtype=tf.float32) 
+                #alpha_loss_reg = tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[0])))), dtype=tf.float32)
+                #beta_loss_reg = tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[1])))), dtype=tf.float32) 
+                #beta_dag_loss_reg = tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[5])))), dtype=tf.float32) 
+                #gamma_loss_reg = tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[2])))), dtype=tf.float32) 
+                #gamma_dag_loss_reg = tf.cast(tf.reduce_sum(tf.abs((tf.math.real(H_trainable[6])))), dtype=tf.float32) 
+                #for i in range(len(H_trainable)):
+                #    loss_L2 += tf.cast(tf.reduce_sum(tf.square((tf.math.real(H_trainable[i])))), dtype=tf.float32) 
+
                 loss = loss1 + self.regularization_factor*loss_reg  #1.7e-5*alpha_loss_reg #+ self.L2_factor*loss_L2
                 print('Iteration: ', count,' Loss: ' , (loss).numpy())
 

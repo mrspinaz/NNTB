@@ -11,8 +11,8 @@ to obtain the input data for training.
 '''
 
 filename = 'kmesh.txt'
-kx_size = 23
-ky_size = 23
+kx_size = 22
+ky_size = 22
 
 kx_new = np.linspace(0,0.5,kx_size)
 ky_new = np.linspace(0,0.5,ky_size)

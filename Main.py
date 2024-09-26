@@ -62,16 +62,16 @@ Files: Your_Hamiltonian.dat <-- use this for NEGF code. Found in the H_output fo
 '''
 
 #Cell Dimensions
-a = 6.290339029863558E-10
-b = 3.631729244941925E-10
+a = 2.912061868832271e-10
+b = 5.04382216226827e-10
 
 #Band Structure
-bands_filename = 'HfS2_23x23_bands.dat'
-output_hamiltonian_name = 'HfS2_DFTfit_noreg.dat'
-Ef = -3.3312 #-2.5 - 0.126
-experimental_bandgap = 1.89638 #[eV]s
-target_bands = 22
-skip_bands = 12
+bands_filename = 'WSi2N4_Supercell_21x21_bands.dat'
+output_hamiltonian_name = 'WSi2N4_H_24B_13.dat'
+Ef = 1.3267 + 0.5 #-2.5 - 0.126
+experimental_bandgap = 2.07 #[eV]s
+target_bands = 24
+skip_bands = 30
 
 #Routines to perform
 fit_MLWF = False
@@ -84,8 +84,8 @@ threshold_val = 0.02
 
 
 #Learning Parameters
-learn_rate = 0.006
-regularization_factor = 0e-5 #Controls Hamiltonian sparsity. Adjust as needed.
+learn_rate = 0.005
+regularization_factor = 1.5e-5 #Controls Hamiltonian sparsity. Adjust as needed.
 regularization_factor_ext = 0e-5 #For double gamma, should be larger than regularization_factor
 L2_factor = 0e-5
 converge_target = 1e-8

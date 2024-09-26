@@ -207,12 +207,11 @@ def Plot_CB_Surf(bands_filename,H_filename, skip_bands, target_bands, Ef, a, b):
     plt.show()
 
 
-def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
+def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, Eg, a, b):
 
     nband, nks, truncated_bands, kpoints,c,v = Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b)
-
     adjust_bandgap = True
-    experimental_bandgap = 1.89638 #0.74 for 3L_Te
+    experimental_bandgap = Eg #0.74 for 3L_Te
     if(adjust_bandgap):
         first_eigval_set = truncated_bands[1,:]
         pos_eigvals = [a for a in first_eigval_set if a> 0]
@@ -227,7 +226,7 @@ def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
         valence_band = truncated_bands[:,v]
 
         bandgap = np.min(conduction_band) - np.max(valence_band)
-        print("Ec = " , np.min(conduction_band) , "Ev = " , np.max(valence_band))
+        #print("Ec = " , np.min(conduction_band) , "Ev = " , np.max(valence_band))
         bandgap_shift = experimental_bandgap - bandgap
         
         truncated_bands[:,c:] += bandgap_shift/2 
@@ -236,11 +235,11 @@ def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
         #For testing
         new_conduction_band = truncated_bands[:,c]
         new_valence_band = truncated_bands[:,v]
-        print("Ec = " , np.min(new_conduction_band) , "Ev = " , np.max(new_valence_band))
+        #print("Ec = " , np.min(new_conduction_band) , "Ev = " , np.max(new_valence_band))
     
     kx = kpoints[0,:]
     ky = kpoints[1,:]
-    print(len(ky))
+    
 
     hamiltonian = Load_H_From_Save(H_filename)
     alpha = hamiltonian[0]
@@ -262,7 +261,7 @@ def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
             delta11_dagger*np.exp(-1j*kx[ii]*a - 1j*ky[ii]*b) + delta1_min1_dagger*np.exp(-1j*kx[ii]*a + 1j*ky[ii]*b)
         eigvals, eigvecs = np.linalg.eig(H)
 
-        E[:,ii] = np.real(np.sort((eigvals.T)))
+        E[:,ii] = np.real((eigvals.T))
     
     DeltaEc = min(E[c,:])
     DeltaEv = -1*max(E[v,:])
@@ -274,8 +273,8 @@ def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
     x_vals = np.linspace(0,1,len(kx))
     plt.xticks([0, 0.25, 0.5, 0.75, 1.0], ['$\Gamma$', 'X', 'S', 'Y', '$\Gamma$'])
     plt.ylabel("E [eV]")
-    plt.plot(x_vals, truncated_bands,'r')
-    plt.plot(x_vals,E.T,'b--')
+    plt.plot(x_vals, truncated_bands,'r',linewidth=2)
+    plt.plot(x_vals,E.T,'bo-',markersize=6,alpha=0.8)
     plt.show()
 
 def Plot_Hamiltonian(H_filename):
@@ -330,17 +329,18 @@ def Plot_Hamiltonian(H_filename):
 plt.close("all")
 
 
-a = 6.290339029863558E-10
-b = 3.631729244941925E-10
-Ef = -3.3312
-target_bands = 22
-skip_bands = 12
-H_filename = 'HfS2_DFTfit_noreg.dat'
-DFT_filename = 'HfS2_bands.dat'
+a = 2.912061868832271e-10
+b = 5.04382216226827e-10
+Ef = 1.3267 + 0.5
+Eg = 2.07
+target_bands = 24
+skip_bands = 30
+H_filename = 'WSi2N4_H_24B_13.dat'
+DFT_filename = 'WSi2N4_Supercell_GXSYG_bands.dat'
 
 #Plot_CB_Surf('HfS2_31x31_bands.dat',12,18, -2.5834 , 6.290339483e-10, 3.631729507E-10)
 #Plot_Bands('HfS2_GXSYG_bands.dat',12,18, -2.5834, 6.290339483e-10, 3.631729507E-10)
-Plot_Bands(DFT_filename,H_filename,skip_bands,target_bands,Ef, a, b)
+Plot_Bands(DFT_filename,H_filename,skip_bands,target_bands,Ef, Eg, a, b)
 #Plot_CB_Surf(DFT_filename,H_filename,30,24, 1.3267, a, b)
 Plot_Hamiltonian(H_filename)
 

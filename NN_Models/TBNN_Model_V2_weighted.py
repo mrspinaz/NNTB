@@ -328,8 +328,8 @@ class TBNN_V2_weighted:
     def create_weight_mat(self,c,v):
         num_cb = self.target_bands - c
         num_vb = self.target_bands - num_cb
-        cb_weights = np.array([1,1,1,1,1,1,0,0,0,0])
-        vb_weights = np.array([0,0,0,0,0,0,1,1,1,1,1,1])
+        cb_weights = np.array([1,1,1,1,1,1,0.005,0,0,0,0,0])
+        vb_weights = np.array([0,0,0,0,0,0,0,0,0.005,1,1,1])
         band_weights = np.concatenate((vb_weights, cb_weights))
         print(band_weights)
         return tf.convert_to_tensor(band_weights, dtype=tf.float32)

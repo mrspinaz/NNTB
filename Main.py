@@ -3,6 +3,7 @@ import tensorflow as tf
 from NN_Models.TBNN_Model_V2 import TBNN_V2
 from NN_Models.TBNN_Model_V2_extended import TBNN_V2_DoubleGamma
 from NN_Models.TBNN_Model_V2_weighted import TBNN_V2_weighted
+from NN_Models.TBNN_Model_V2_optimized import TBNN_V2_optimized
 from NN_Models.TBNN_Model_V2_fitwan import TBNN_V2_fitwan
 from NN_Models.TBNN_Model_V2_fitwan_extended import TBNN_V2_fitwan_extended
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
@@ -62,20 +63,21 @@ Files: Your_Hamiltonian.dat <-- use this for NEGF code. Found in the H_output fo
 '''
 
 #Cell Dimensions
-a = 2.912061868832271e-10
-b = 5.04382216226827e-10
+
+a = 2.913993568464149e-10
+b = 5.047184549175005e-10
 
 #Band Structure
-bands_filename = 'WSi2N4_Supercell_21x21_bands.dat'
-output_hamiltonian_name = 'WSi2N4_H_24B_13.dat'
+bands_filename = 'WSi2N4_Supercell_30x30_bands.dat'
+output_hamiltonian_name = 'WSi2N4_H_22B_16.dat'
 Ef = 1.3267 + 0.5 #-2.5 - 0.126
-experimental_bandgap = 2.07 #[eV]s
+experimental_bandgap = 2.06 #[eV]s
 target_bands = 24
 skip_bands = 30
 
 #Routines to perform
 fit_MLWF = False
-restart = True
+restart = False
 bandgap_correction = True
 
 #set max iter to 0 if using threshold
@@ -85,11 +87,11 @@ threshold_val = 0.02
 
 #Learning Parameters
 learn_rate = 0.005
-regularization_factor = 1.5e-5 #Controls Hamiltonian sparsity. Adjust as needed.
+regularization_factor = 1.0e-5 #Controls Hamiltonian sparsity. Adjust as needed.
 regularization_factor_ext = 0e-5 #For double gamma, should be larger than regularization_factor
 L2_factor = 0e-5
 converge_target = 1e-8
-max_iter = 600
+max_iter = 700
 
 def main():
     #tbnn2 = TBNN_V2(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor , bands_filename, output_hamiltonian_name, bandgap_correction, experimental_bandgap)
@@ -99,7 +101,12 @@ def main():
     #                            regularization_factor, regularization_factor_ext, bands_filename, output_hamiltonian_name, bandgap_correction, experimental_bandgap, do_threshold, threshold_val)
     #tbnn2.fit_bands()
 
-    tbnn2 = TBNN_V2_weighted(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, 
+    #tbnn2 = TBNN_V2_weighted(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, 
+    #                         regularization_factor , bands_filename, output_hamiltonian_name, bandgap_correction, experimental_bandgap, 
+    #                         L2_factor, do_threshold, threshold_val, fit_MLWF)
+    #tbnn2.fit_bands()
+
+    tbnn2 = TBNN_V2_optimized(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, 
                              regularization_factor , bands_filename, output_hamiltonian_name, bandgap_correction, experimental_bandgap, 
                              L2_factor, do_threshold, threshold_val, fit_MLWF)
     tbnn2.fit_bands()

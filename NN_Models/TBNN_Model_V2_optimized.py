@@ -3,7 +3,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
-class TBNN_V2_weighted:
+class TBNN_V2_optimized:
     #Maybe change code at some point to extract these from scf, bands, etc output files, other than boolean commands.
     def __init__(self, a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor ,bands_filename, output_hamiltonian_name, adjust_bandgap, experimental_bandgap,L2_factor,do_threshold,threshold_val, fit_MLWF):
         self.a = a
@@ -224,45 +224,28 @@ class TBNN_V2_weighted:
     
 
     def Calculate_Energy_Eigenvals(self, H_train, kpoints, nks):
-            
-            alpha = H_train[0]
-            beta = H_train[1]
-            gamma = H_train[2]
-            delta11 = H_train[3]
-            delta1_min1 = H_train[4]
-            beta_dagger = H_train[5]
-            gamma_dagger = H_train[6]
-            delta11_dagger = H_train[7]
-            delta1_min1_dagger = H_train[8]
 
-           
-            E = tf.zeros([nks, self.target_bands], dtype=tf.complex64)
+        kx = kpoints[0, :]
+        ky = kpoints[1, :]
 
-            for ii in range(nks):
-                H = alpha + \
-                    beta*tf.exp(1j*kpoints[0][ii]*self.a_tens) + \
-                    gamma*tf.exp(1j*kpoints[1][ii]*self.b_tens) + \
-                    delta11*tf.exp(1j*kpoints[0][ii]*self.a_tens + 1j*kpoints[1][ii]*self.b_tens) + \
-                    delta1_min1*tf.exp(1j*kpoints[0][ii]*self.a_tens - 1j*kpoints[1][ii]*self.b_tens) + \
-                    beta_dagger*tf.exp(-1j*kpoints[0][ii]*self.a_tens) + \
-                    gamma_dagger*tf.exp(-1j*kpoints[1][ii]*self.b_tens) + \
-                    delta11_dagger*tf.exp(-1j*kpoints[0][ii]*self.a_tens - 1j*kpoints[1][ii]*self.b_tens) + \
-                    delta1_min1_dagger*tf.exp(-1j*kpoints[0][ii]*self.a_tens + 1j*kpoints[1][ii]*self.b_tens)
-                
-                eigvals, eigvecs = tf.linalg.eig(H) #tf.linalg.eigh(H)
-                eigvals = tf.reshape(eigvals, shape=[1,self.target_bands])
-                
-                E = E + tf.scatter_nd([[ii]],eigvals,[nks,self.target_bands])
+        exp_kx = tf.reshape(tf.exp(1j * kx * self.a_tens),(nks,1,1))
+        exp_ky = tf.reshape(tf.exp(1j * ky * self.b_tens),(nks,1,1))
 
-            #Flatten numpy array and convert back to tensor. The math.real() operation converts datatype to float32.
-            E = tf.math.real(E)
-            E = tf.sort(E, axis=1)
-            #E = E[:, self.added_bands//2 : self.added_bands//2 + self.original_num_TBbands]
-            #E_frac = E.numpy()
-            #E_frac = E_frac[:,self.added_bands//2 : self.added_bands//2 + self.original_num_TBbands]
-            #E_frac = tf.convert_to_tensor(E_frac, dtype=tf.float32)
+        H = (H_train[0]
+                + H_train[1] * exp_kx
+                + H_train[2] * exp_ky
+                + H_train[3] * exp_kx * exp_ky
+                + H_train[4] * exp_kx * tf.math.conj(exp_ky)
+                + H_train[5] * tf.math.conj(exp_kx)
+                + H_train[6] * tf.math.conj(exp_ky)
+                + H_train[7] * tf.math.conj(exp_kx) * tf.math.conj(exp_ky)
+                + H_train[8] * tf.math.conj(exp_kx) * exp_ky )
 
-            return E
+        eigvals = tf.math.real(tf.linalg.eigvals(H))
+        eigvals = tf.sort(eigvals, axis=1)
+
+
+        return eigvals
 
     def _Save_Output(self, H_trainable):  
             
@@ -329,8 +312,8 @@ class TBNN_V2_weighted:
     def create_weight_mat(self,c,v):
         num_cb = self.target_bands - c
         num_vb = self.target_bands - num_cb
-        cb_weights = np.array([1.5,1.5,1,1,1,0.005,0.000,0,0,0,0,0])
-        vb_weights = np.array([0,0,0,0,0,0,0,0,0.005,1,1,1])
+        cb_weights = np.array([1.5,1.5,1,1,1,1,0.000,0,0,0,0,0])
+        vb_weights = np.array([0,0,0,0,0,0,0,0.000,0.005,1,1.5,1.5])
         band_weights = np.concatenate((vb_weights, cb_weights))
         print(band_weights)
         return tf.convert_to_tensor(band_weights, dtype=tf.float32)
@@ -390,20 +373,22 @@ class TBNN_V2_weighted:
             
             grad_real = tf.cast(tf.math.real(grad), dtype=tf.complex64)
             
-
+            
             sym_grad = []
             
             #Alpha
-            diagonal = tf.linalg.tensor_diag_part(grad_real[0])
-            diag_tensor = tf.linalg.diag(diagonal)
+            grad_real_alpha = 0.5*(grad_real[0] + tf.transpose(grad_real[0]))
+            #diagonal = tf.linalg.tensor_diag_part(grad_real[0])
+            #diag_tensor = tf.linalg.diag(diagonal)
 
-            upper_trig = tf.linalg.band_part(grad_real[0],0,-1)
-            upper_trig_diag = tf.linalg.diag(tf.linalg.tensor_diag_part(upper_trig))
-            upper_trig_nodiag = upper_trig - upper_trig_diag
+            #upper_trig = tf.linalg.band_part(grad_real[0],0,-1)
+            #upper_trig_diag = tf.linalg.diag(tf.linalg.tensor_diag_part(upper_trig))
+            #upper_trig_nodiag = upper_trig - upper_trig_diag
     
-            lower_trig_nodiag = tf.transpose(upper_trig_nodiag)
+            #lower_trig_nodiag = tf.transpose(upper_trig_nodiag)
             
-            sym_grad.append(diag_tensor + upper_trig_nodiag + lower_trig_nodiag)
+            #sym_grad.append(diag_tensor + upper_trig_nodiag + lower_trig_nodiag)
+            sym_grad.append(grad_real_alpha)
         
             #Beta
             sym_grad.append(grad_real[1])
@@ -422,7 +407,10 @@ class TBNN_V2_weighted:
             sym_grad.append(tf.transpose(grad_real[2]))
             sym_grad.append(tf.transpose(grad_real[3]))
             sym_grad.append(tf.transpose(grad_real[4]))
-
+            #sym_grad.append(grad_real[5])
+            #sym_grad.append(grad_real[6])
+            #sym_grad.append(grad_real[7])
+            #sym_grad.append(grad_real[8])
             sym_grad_tens = tf.stack(sym_grad)
             
             opt.apply_gradients(zip(sym_grad_tens, H_trainable))

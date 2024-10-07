@@ -1,6 +1,7 @@
 import numpy as np
 import re
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 from itertools import product
@@ -261,7 +262,7 @@ def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, Eg, a, 
             delta11_dagger*np.exp(-1j*kx[ii]*a - 1j*ky[ii]*b) + delta1_min1_dagger*np.exp(-1j*kx[ii]*a + 1j*ky[ii]*b)
         eigvals, eigvecs = np.linalg.eig(H)
 
-        E[:,ii] = np.real((eigvals.T))
+        E[:,ii] = np.real(np.sort((eigvals.T)))
     
     DeltaEc = min(E[c,:])
     DeltaEv = -1*max(E[v,:])
@@ -269,12 +270,24 @@ def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, Eg, a, 
     print("Ef - Ev = ", DeltaEv, " eV")
     print("Eg = ", DeltaEc + DeltaEv, " eV")
 
-    plt.figure()
+    plt.figure(figsize=(8, 8),dpi=100)
+    plt.rcParams.update({'font.size': 22})
     x_vals = np.linspace(0,1,len(kx))
-    plt.xticks([0, 0.25, 0.5, 0.75, 1.0], ['$\Gamma$', 'X', 'S', 'Y', '$\Gamma$'])
-    plt.ylabel("E [eV]")
-    plt.plot(x_vals, truncated_bands,'r',linewidth=2)
-    plt.plot(x_vals,E.T,'bo-',markersize=6,alpha=0.8)
+    plt.xticks([0, 0.25, 0.5, 0.75, 1.0], ['$\Gamma$', 'X', 'S', 'Y', '$\Gamma$'],fontsize=22)
+    plt.ylabel("E - E$_F$ (eV)", fontsize=22)
+    plt1 = plt.plot(x_vals, truncated_bands,'r',linewidth=2)
+    plt2 = plt.plot(x_vals,E[6:,:].T,'bo',markevery=3,markersize=6,alpha=0.8)
+    plt.margins(x=0)
+    plt.ylim([-3,3])
+
+    line = Line2D([0], [0], label='DFT', color='r')
+    dot = Line2D([0], [0], label='MLTB', color='b',marker='o',markersize=5,linestyle='')
+    
+    handles, labels = plt.gca().get_legend_handles_labels()
+    handles = [line, dot]
+    plt.legend(handles=handles)
+
+
     plt.show()
 
 def Plot_Hamiltonian(H_filename):
@@ -316,8 +329,12 @@ def Plot_Hamiltonian(H_filename):
 
 
     plt.figure()
+    plt.xticks([])
+    plt.yticks([])
+    plt.rcParams.update({'font.size': 15})
     im = plt.imshow(np.real(H_map), cmap="seismic",vmin=-3, vmax=3)
-    plt.colorbar(im)
+
+    plt.colorbar(im,aspect=10)
     plt.axhline(y=num_bands-0.5,color='k')
     plt.axhline(y=num_bands*2-0.5,color='k')
     plt.axvline(x=num_bands-0.5,color='k')
@@ -329,14 +346,14 @@ def Plot_Hamiltonian(H_filename):
 plt.close("all")
 
 
-a = 2.912061868832271e-10
-b = 5.04382216226827e-10
+a = 2.913993568464149e-10
+b = 5.047184549175005e-10
 Ef = 1.3267 + 0.5
 Eg = 2.07
 target_bands = 24
 skip_bands = 30
-H_filename = 'WSi2N4_H_24B_13.dat'
-DFT_filename = 'WSi2N4_Supercell_GXSYG_bands.dat'
+H_filename = 'WSi2N4_H_22B_16.dat'
+DFT_filename = 'WSi2N4_Supercell_GXSYG_ONCVbands.dat'
 
 #Plot_CB_Surf('HfS2_31x31_bands.dat',12,18, -2.5834 , 6.290339483e-10, 3.631729507E-10)
 #Plot_Bands('HfS2_GXSYG_bands.dat',12,18, -2.5834, 6.290339483e-10, 3.631729507E-10)
@@ -345,7 +362,29 @@ Plot_Bands(DFT_filename,H_filename,skip_bands,target_bands,Ef, Eg, a, b)
 Plot_Hamiltonian(H_filename)
 
 
-#3L vals
-a = 5.84536306E-10
-b = 4.36037009E-10
-Ef = -0.5292
+'''
+Extra Code:
+
+1L WSi2N4 (non-ONCV):
+a = 2.912061868832271e-10
+b = 5.04382216226827e-10
+Ef = 1.3267 + 0.5
+Eg = 2.07
+target_bands = 24
+skip_bands = 30
+H_filename = 'WSi2N4_H_24B_noreg.dat'
+DFT_filename = 'WSi2N4_Supercell_GXSYG_bands.dat'
+
+1L HfS2:
+a = 6.29033902986356e-10
+b = 3.63172924494192e-10
+Ef = -3.2370 
+Eg = 1.90
+target_bands = 22
+skip_bands = 12
+H_filename = 'HfS2_DFTfit_1.dat'
+DFT_filename = 'HfS2_GXSYG_bands.dat'
+
+
+
+'''

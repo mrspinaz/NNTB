@@ -1,7 +1,7 @@
 import numpy as np
 import os
 ### Inputs ###
-hamiltonian_name = "WSi2N4_H_24B_12.dat"
+hamiltonian_name = "WSi2N4_H_24B_15.dat"
 
 
 ### Code ###

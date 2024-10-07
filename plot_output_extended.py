@@ -2,6 +2,7 @@ import numpy as np
 import re
 import matplotlib.pyplot as plt
 from matplotlib import cm
+from matplotlib.lines import Line2D
 from mpl_toolkits.mplot3d import Axes3D
 
 def Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b):
@@ -182,8 +183,8 @@ def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
 
     nband, nks, truncated_bands, kpoints = Extract_Abinit_Eigvals(bands_filename, skip_bands, target_bands, Ef, a, b)
 
-    adjust_bandgap = False
-    experimental_bandgap = 1.5419
+    adjust_bandgap = True
+    experimental_bandgap = 1.9
     if(adjust_bandgap):
         first_eigval_set = truncated_bands[1,:]
         pos_eigvals = [a for a in first_eigval_set if a> 0]
@@ -201,8 +202,8 @@ def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
         print("Ec = " , np.min(conduction_band) , "Ev = " , np.max(valence_band))
         bandgap_shift = experimental_bandgap - bandgap
         
-        truncated_bands[:,c:] += bandgap_shift/2 - 0.1
-        truncated_bands[:,0:v+1] -= bandgap_shift/2 + 0.05
+        truncated_bands[:,c:] += bandgap_shift/2
+        truncated_bands[:,0:v+1] -= bandgap_shift/2 
 
         #For testing
         new_conduction_band = truncated_bands[:,c]
@@ -245,12 +246,25 @@ def Plot_Bands(bands_filename, H_filename, skip_bands, target_bands, Ef, a, b):
 
         E[:,ii] = np.sort((eigvals.T))
 
-    plt.figure()
+    E[c:,:] =  E[c:,:] + 0.6
+    E[0:v+1,:] =  E[0:v+1,:] +0.05
+
+    plt.figure(figsize=(8, 8),dpi=100)
+    plt.rcParams.update({'font.size': 22})
     x_vals = np.linspace(0,1,len(kx))
     plt.xticks([0, 0.25, 0.5, 0.75, 1.0], ['$\Gamma$', 'X', 'S', 'Y', '$\Gamma$'])
-    plt.ylabel("E [eV]")
+    plt.ylabel("E - E$_F$ [eV]")
     plt.plot(x_vals, truncated_bands,'r')
-    plt.plot(x_vals,E.T,'b--')
+    plt.plot(x_vals,E.T,'go',markevery=3,markersize=6,alpha=0.8)
+    plt.ylim([-3,3])
+    plt.margins(x=0)
+
+    line = Line2D([0], [0], label='DFT', color='r')
+    dot = Line2D([0], [0], label='MLWF', color='g',marker='o',markersize=5,linestyle='')
+    
+    handles, labels = plt.gca().get_legend_handles_labels()
+    handles = [line, dot]
+    plt.legend(handles=handles)
     plt.show()
 
 def Plot_Hamiltonian(H_filename):
@@ -323,12 +337,12 @@ def Plot_Hamiltonian(H_filename):
 
 
 
-a = 12.0960905342*0.529177211e-10
-b = 6.98368844626*0.529177211e-10
+a = 6.29033902986356e-10
+b = 3.631729244941925e-10
 #old fermi was -2.5834
 plt.close("all")
 #Plot_CB_Surf('HfS2_31x31_bands.dat',12,18, -2.5834 , 6.290339483e-10, 3.631729507E-10)
 #Plot_Bands('HfS2_GXSYG_bands.dat',12,18, -2.5834, 6.290339483e-10, 3.631729507E-10)
-Plot_Bands('HfS2_bands.dat','ML_HfS2_1L.dat',12,18,-3.3312, a, b)
+Plot_Bands('HfS2_bands.dat','HfS2_1L_BigGammaWan_unadjusted.dat',12,22,-3.3312, a, b)
 #Plot_CB_Surf('2L_Te_31x31_bands.dat',12,12, -1.9463, 5.7885636E-10, 4.3185190E-10)
 #Plot_Hamiltonian('3L_Te_DoubleGamma_FullIBZFit_L1e-5_weighted_21x21_27bands_14.dat')

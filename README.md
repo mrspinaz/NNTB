@@ -1,4 +1,4 @@
-# TBNN
+# NNTB
 
 Tight-binding model generation using machine learning approach.
 

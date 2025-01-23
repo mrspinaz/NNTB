@@ -64,20 +64,20 @@ Files: Your_Hamiltonian.dat <-- use this for NEGF code. Found in the H_output fo
 
 #Cell Dimensions
 
-a = 2.913993568464149e-10
-b = 5.047184549175005e-10
+a = 2*6.149189998598033e-10
+b = 2*6.149189998598033e-10
 
 #Band Structure
-bands_filename = 'WSi2N4_Supercell_30x30_bands.dat'
-output_hamiltonian_name = 'WSi2N4_H_22B_16.dat'
-Ef = 1.3267 + 0.5 #-2.5 - 0.126
-experimental_bandgap = 2.06 #[eV]s
+bands_filename = 'PdTe2_2x2_40x40_bands_PAW.dat'
+output_hamiltonian_name = 'PdTe2_2x2_24B_H1.dat'
+Ef = -2.4557 + 0.1 #-2.5 - 0.126
+experimental_bandgap = 1.2 #[eV]s
 target_bands = 24
-skip_bands = 30
+skip_bands = 80
 
 #Routines to perform
 fit_MLWF = False
-restart = False
+restart = True
 bandgap_correction = True
 
 #set max iter to 0 if using threshold
@@ -86,12 +86,12 @@ threshold_val = 0.02
 
 
 #Learning Parameters
-learn_rate = 0.005
-regularization_factor = 1.0e-5 #Controls Hamiltonian sparsity. Adjust as needed.
+learn_rate = 0.001
+regularization_factor = 1.22e-5 #Controls Hamiltonian sparsity. Adjust as needed.
 regularization_factor_ext = 0e-5 #For double gamma, should be larger than regularization_factor
 L2_factor = 0e-5
 converge_target = 1e-8
-max_iter = 700
+max_iter = 4000
 
 def main():
     #tbnn2 = TBNN_V2(a, b, Ef, restart, skip_bands, target_bands, converge_target, max_iter, learn_rate, regularization_factor , bands_filename, output_hamiltonian_name, bandgap_correction, experimental_bandgap)
@@ -123,3 +123,20 @@ def main():
 if __name__ == '__main__':
     main()
 
+"""
+WSi2N4 Settings
+a = 2.913993568464149e-10
+b = 5.047184549175005e-10
+
+#Band Structure
+bands_filename = 'WSi2N4_Supercell_50x25_halfBZ_bands.dat'
+output_hamiltonian_name = 'WSi2N4_H_24B_20.dat'
+Ef = 1.3267 + 0.5 #-2.5 - 0.126
+experimental_bandgap = 2.07 #[eV]s
+target_bands = 24
+skip_bands = 30
+
+cb_weights = np.array([1,1,1,1,1,1,1,1,0,0,0,0])
+vb_weights = np.array([0,0,0,0,0,0,0,0.000,0.000,0.7,1,1])
+
+"""

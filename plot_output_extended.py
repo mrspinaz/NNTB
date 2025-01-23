@@ -343,6 +343,6 @@ b = 3.631729244941925e-10
 plt.close("all")
 #Plot_CB_Surf('HfS2_31x31_bands.dat',12,18, -2.5834 , 6.290339483e-10, 3.631729507E-10)
 #Plot_Bands('HfS2_GXSYG_bands.dat',12,18, -2.5834, 6.290339483e-10, 3.631729507E-10)
-Plot_Bands('HfS2_bands.dat','HfS2_1L_BigGammaWan_unadjusted.dat',12,22,-3.3312, a, b)
+Plot_Bands('HfS2_bands.dat','HfS2_1L_BigGammaWan_unadjusted_2.dat',12,22,-3.3312, a, b)
 #Plot_CB_Surf('2L_Te_31x31_bands.dat',12,12, -1.9463, 5.7885636E-10, 4.3185190E-10)
 #Plot_Hamiltonian('3L_Te_DoubleGamma_FullIBZFit_L1e-5_weighted_21x21_27bands_14.dat')

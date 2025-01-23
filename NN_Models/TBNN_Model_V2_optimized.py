@@ -65,23 +65,25 @@ class TBNN_V2_optimized:
 
         file.close()
 
-        #Convert k_points to their actual values
+        #Convert k_points in .dat file to their actual values in m^-1
         ky_factor = self.a/self.b
-        kpoints[0,:] =  np.abs((kpoints[0,:])*(2.0*np.pi/self.a))
-        kpoints[1,:] =  np.abs((kpoints[1,:]/ky_factor)*(2.0*np.pi/self.b))
+        kpoints[0,:] =  (kpoints[0,:])*(2.0*np.pi/self.a)
+        kpoints[1,:] =  (kpoints[1,:]/ky_factor)*(2.0*np.pi/self.b)
 
+        #identify conduction and valence band indices
         first_eigval_set = truncated_bands[1,:]
         pos_eigvals = [a for a in first_eigval_set if a> 0]
         neg_eigvals = [a for a in first_eigval_set if a < 0]
 
         pos_smallest = min(pos_eigvals, key=abs)
         neg_smallest = min(neg_eigvals, key=abs)
-        c = int(np.where(first_eigval_set == pos_smallest)[0])
-        v = int(np.where(first_eigval_set == neg_smallest)[0])
+        c = int(np.where(first_eigval_set == pos_smallest)[0][0])
+        v = int(np.where(first_eigval_set == neg_smallest)[0][0])
 
         conduction_band = truncated_bands[:,c]
         valence_band = truncated_bands[:,v]
 
+        #Calculate DFT-predicted bandgap
         bandgap = np.min(conduction_band) - np.max(valence_band)
         
 
@@ -106,7 +108,10 @@ class TBNN_V2_optimized:
             
             truncated_bands[:,c:] += bandgap_shift/2
             truncated_bands[:,0:v+1] -= bandgap_shift/2
-
+            print(bandgap)
+            print(self.experimental_bandgap)
+            print(c)
+            print(v)
             
             #For testing
             #new_conduction_band = truncated_bands[:,c]
@@ -312,8 +317,8 @@ class TBNN_V2_optimized:
     def create_weight_mat(self,c,v):
         num_cb = self.target_bands - c
         num_vb = self.target_bands - num_cb
-        cb_weights = np.array([1.5,1.5,1,1,1,1,0.000,0,0,0,0,0])
-        vb_weights = np.array([0,0,0,0,0,0,0,0.000,0.005,1,1.5,1.5])
+        cb_weights = np.array([1,1,1,1,1,1,1,1,1,1,1,1])
+        vb_weights = np.array([1,1,1,1,1,1,1,1,1,1,1,1])
         band_weights = np.concatenate((vb_weights, cb_weights))
         print(band_weights)
         return tf.convert_to_tensor(band_weights, dtype=tf.float32)

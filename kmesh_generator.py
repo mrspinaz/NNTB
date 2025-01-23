@@ -11,11 +11,11 @@ to obtain the input data for training.
 '''
 
 filename = 'kmesh.txt'
-kx_size = 16
-ky_size = 16
+kx_size = 40
+ky_size = 40
 
 kx_new = np.linspace(0,0.5,kx_size)
-ky_new = np.linspace(0,0.5,ky_size)
+ky_new = np.linspace(-0.5,0.5,ky_size)
 
 kx_2D, ky_2D = np.meshgrid(kx_new,ky_new)
 nks = np.size(kx_2D)
